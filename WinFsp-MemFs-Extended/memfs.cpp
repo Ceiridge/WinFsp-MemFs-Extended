@@ -54,7 +54,7 @@ FSP_FSCTL_STATIC_ASSERT(MEMFS_MAX_PATH > MAX_PATH,
     * Define the MEMFS_NAMED_STREAMS macro to include named streams support.
     * Named streams are not supported.
     */
-// #define MEMFS_NAMED_STREAMS
+#define MEMFS_NAMED_STREAMS
 
     /*
      * Define the MEMFS_DIRINFO_BY_NAME macro to include GetDirInfoByName.
@@ -1299,7 +1299,10 @@ static NTSTATUS Overwrite(FSP_FILE_SYSTEM* FileSystem,
         MemfsFileNodeMapEnumerateFn, &Context);
     for (Index = 0; Context.Count > Index; Index++)
     {
-        LONG RefCount = FspInterlockedLoad32((INT32*)&Context.FileNodes[Index]->RefCount);
+        // TODO: This is not supported yet in the stable release
+        //LONG RefCount = FspInterlockedLoad32((INT32*)&Context.FileNodes[Index]->RefCount);
+        LONG RefCount = Context.FileNodes[Index]->RefCount;
+        MemoryBarrier(); // Remove this barrier in the future
         if (2 >= RefCount)
             MemfsFileNodeMapRemove(Memfs->FileNodeMap, Context.FileNodes[Index]);
     }

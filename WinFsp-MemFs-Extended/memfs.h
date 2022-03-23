@@ -23,7 +23,6 @@
 #define MEMFS_H_INCLUDED
 
 #include <winfsp/winfsp.h>
-#include <winfsp/fsctl.h>
 
 #ifdef __cplusplus
 extern "C" {
