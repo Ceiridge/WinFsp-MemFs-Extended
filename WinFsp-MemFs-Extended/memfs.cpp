@@ -26,6 +26,7 @@
 #include <cassert>
 #include <map>
 #include <unordered_map>
+#include <Psapi.h>
 
   /* SLOWIO */
 #include <thread>
@@ -329,8 +330,11 @@ typedef struct _MEMFS
 {
     FSP_FILE_SYSTEM* FileSystem;
     MEMFS_FILE_NODE_MAP* FileNodeMap;
-    ULONG MaxFileNodes;
-    ULONG MaxFileSize;
+    // memefs: MaxFsSize instead of max. file nodes and individual limits
+    UINT64 MaxFsSize;
+    UINT64 CachedMaxFsSize;
+    UINT64 LastCacheTime;
+
 #ifdef MEMFS_SLOWIO
     ULONG SlowioMaxDelay;
     ULONG SlowioPercentDelay;
@@ -340,6 +344,63 @@ typedef struct _MEMFS
     UINT16 VolumeLabelLength;
     WCHAR VolumeLabel[32];
 } MEMFS;
+
+// memefs: This is required to update the maximum total size according to the available RAM that is left
+static inline
+UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
+{
+	if (Memfs->MaxFsSize != 0)
+    {
+        return Memfs->MaxFsSize;
+	}
+
+    const UINT64 usedSize = MemefsGetMaxTotalSize(Memfs);
+    const UINT64 currentTicks = GetTickCount64();
+
+    // Limit calls to GlobalMemoryStatusEx with a 100ms cooldown to improve performance
+    if (currentTicks - Memfs->LastCacheTime < 100) {
+        return Memfs->CachedMaxFsSize + usedSize;
+    }
+
+    MEMORYSTATUSEX memoryStatus;
+    if (!GlobalMemoryStatusEx(&memoryStatus)) 
+    {
+        return 0;
+    }
+
+	// TODO: Check whether it should be limited by physical or virtual memory
+    const UINT64 availMemorySize = min(memoryStatus.ullAvailPhys, memoryStatus.ullAvailVirtual);
+
+    Memfs->CachedMaxFsSize = availMemorySize;
+    Memfs->LastCacheTime = currentTicks;
+
+    return availMemorySize + usedSize;
+}
+
+// memefs: Get the all file sizes and the node map size
+static inline
+UINT64 MemefsGetUsedTotalSize(MEMFS* Memfs) {
+    // To be used later
+	//const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE));
+    // EA node map is ignored, because it is insignificant
+
+    PROCESS_MEMORY_COUNTERS_EX memoryCounters;
+    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&memoryCounters, sizeof(memoryCounters));
+    return max(memoryCounters.WorkingSetSize, memoryCounters.PrivateUsage);
+}
+
+static inline
+UINT64 MemefsGetAvailableTotalSize(MEMFS* Memfs)
+{
+    const UINT64 totalSize = MemefsGetMaxTotalSize(Memfs);
+	const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs);
+
+    if(usedSize >= totalSize) {
+        return 0;
+    }
+
+    return totalSize - usedSize;
+}
 
 static inline
 NTSTATUS MemfsFileNodeCreate(PWSTR FileName, MEMFS_FILE_NODE** PFileNode)
@@ -985,7 +1046,8 @@ static NTSTATUS GetVolumeInfo(FSP_FILE_SYSTEM* FileSystem,
     // VolumeInfo->FreeSize = (Memfs->MaxFileNodes - MemfsFileNodeMapCount(Memfs->FileNodeMap)) *
         //(UINT64)Memfs->MaxFileSize;
 
-
+    VolumeInfo->TotalSize = MemefsGetMaxTotalSize(Memfs);
+    VolumeInfo->FreeSize = MemefsGetAvailableTotalSize(Memfs);
     VolumeInfo->VolumeLabelLength = Memfs->VolumeLabelLength;
     memcpy(VolumeInfo->VolumeLabel, Memfs->VolumeLabel, Memfs->VolumeLabelLength);
 
@@ -1093,10 +1155,11 @@ static NTSTATUS Create(FSP_FILE_SYSTEM* FileSystem,
     if (0 == ParentNode)
         return Result;
 
-    if (MemfsFileNodeMapCount(Memfs->FileNodeMap) >= Memfs->MaxFileNodes)
-        return STATUS_CANNOT_MAKE;
+    // memefs: No more file count limit
+    // if (MemfsFileNodeMapCount(Memfs->FileNodeMap) >= Memfs->MaxFileNodes)
+    //    return STATUS_CANNOT_MAKE;
 
-    if (AllocationSize > Memfs->MaxFileSize)
+    if (AllocationSize > MemefsGetAvailableTotalSize(Memfs))
         return STATUS_DISK_FULL;
 
 #if defined(MEMFS_NAME_NORMALIZATION)
@@ -1598,7 +1661,7 @@ static NTSTATUS SetFileSizeInternal(FSP_FILE_SYSTEM* FileSystem,
     {
         if (FileNode->FileInfo.AllocationSize != NewSize)
         {
-            if (NewSize > Memfs->MaxFileSize)
+            if (NewSize > MemefsGetAvailableTotalSize(Memfs))
                 return STATUS_DISK_FULL;
 
             PVOID FileData = LargeHeapRealloc(FileNode->FileData, (size_t)NewSize);
@@ -2309,8 +2372,7 @@ static FSP_FILE_SYSTEM_INTERFACE MemfsInterface =
 NTSTATUS MemfsCreateFunnel(
     ULONG Flags,
     ULONG FileInfoTimeout,
-    ULONG MaxFileNodes,
-    ULONG MaxFileSize,
+    UINT64 MaxFsSize,
     ULONG SlowioMaxDelay,
     ULONG SlowioPercentDelay,
     ULONG SlowioRarefyDelay,
@@ -2353,9 +2415,9 @@ NTSTATUS MemfsCreateFunnel(
     }
 
     memset(Memfs, 0, sizeof * Memfs);
-    Memfs->MaxFileNodes = MaxFileNodes;
     AllocationUnit = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
-    Memfs->MaxFileSize = (ULONG)((MaxFileSize + AllocationUnit - 1) / AllocationUnit * AllocationUnit);
+    // memefs: MaxFsSize
+    Memfs->MaxFsSize = MaxFsSize;
 
 #ifdef MEMFS_SLOWIO
     Memfs->SlowioMaxDelay = SlowioMaxDelay;
@@ -2409,7 +2471,7 @@ NTSTATUS MemfsCreateFunnel(
     if (0 != VolumePrefix)
         wcscpy_s(VolumeParams.Prefix, sizeof VolumeParams.Prefix / sizeof(WCHAR), VolumePrefix);
     wcscpy_s(VolumeParams.FileSystemName, sizeof VolumeParams.FileSystemName / sizeof(WCHAR),
-        0 != FileSystemName ? FileSystemName : L"-MEMFS");
+        0 != FileSystemName ? FileSystemName : L"-MEMEFS");
 
     Result = FspFileSystemCreate(DevicePath, &VolumeParams, &MemfsInterface, &Memfs->FileSystem);
     if (!NT_SUCCESS(Result))
@@ -2421,8 +2483,8 @@ NTSTATUS MemfsCreateFunnel(
     }
 
     Memfs->FileSystem->UserContext = Memfs;
-    Memfs->VolumeLabelLength = sizeof L"MEMFS" - sizeof(WCHAR);
-    memcpy(Memfs->VolumeLabel, L"MEMFS", Memfs->VolumeLabelLength);
+    Memfs->VolumeLabelLength = sizeof L"MEMEFS" - sizeof(WCHAR);
+    memcpy(Memfs->VolumeLabel, L"MEMEFS", Memfs->VolumeLabelLength);
 
 #if 0
     FspFileSystemSetOperationGuardStrategy(Memfs->FileSystem,

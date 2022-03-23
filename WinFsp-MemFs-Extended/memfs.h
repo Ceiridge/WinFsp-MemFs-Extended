@@ -56,8 +56,7 @@ extern "C" {
     NTSTATUS MemfsCreateFunnel(
         ULONG Flags,
         ULONG FileInfoTimeout,
-        ULONG MaxFileNodes,
-        ULONG MaxFileSize,
+        UINT64 MaxFsSize,
         ULONG SlowioMaxDelay,
         ULONG SlowioPercentDelay,
         ULONG SlowioRarefyDelay,

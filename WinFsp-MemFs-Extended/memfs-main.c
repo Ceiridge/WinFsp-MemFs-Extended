@@ -30,12 +30,20 @@
 
 #define argtos(v)                       if (arge > ++argp) v = *argp; else goto usage
 #define argtol(v)                       if (arge > ++argp) v = wcstol_deflt(*argp, v); else goto usage
+#define argtoll(v)                      if (arge > ++argp) v = wcstoll_deflt(*argp, v); else goto usage
 
 static ULONG wcstol_deflt(wchar_t* w, ULONG deflt)
 {
     wchar_t* endp;
     ULONG ul = wcstol(w, &endp, 0);
     return L'\0' != w[0] && L'\0' == *endp ? ul : deflt;
+}
+
+static UINT64 wcstoll_deflt(wchar_t* w, UINT64 deflt)
+{
+    wchar_t* endp;
+    UINT64 ull = wcstoll(w, &endp, 0);
+    return L'\0' != w[0] && L'\0' == *endp ? ull : deflt;
 }
 
 NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
@@ -46,8 +54,7 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
     ULONG Flags = MemfsDisk;
     ULONG OtherFlags = 0;
     ULONG FileInfoTimeout = INFINITE;
-    ULONG MaxFileNodes = 1024;
-    ULONG MaxFileSize = 16 * 1024 * 1024;
+    UINT64 MaxFsSize = 0;
     ULONG SlowioMaxDelay = 0;       /* -M: maximum slow IO delay in millis */
     ULONG SlowioPercentDelay = 0;   /* -P: percent of slow IO to make pending */
     ULONG SlowioRarefyDelay = 0;    /* -R: adjust the rarity of pending slow IO */
@@ -88,9 +95,6 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
         case L'M':
             argtol(SlowioMaxDelay);
             break;
-        case L'n':
-            argtol(MaxFileNodes);
-            break;
         case L'P':
             argtol(SlowioPercentDelay);
             break;
@@ -101,7 +105,8 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
             argtos(RootSddl);
             break;
         case L's':
-            argtol(MaxFileSize);
+            // memefs
+            argtoll(MaxFsSize);
             break;
         case L't':
             argtol(FileInfoTimeout);
@@ -147,8 +152,7 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
     Result = MemfsCreateFunnel(
         Flags | OtherFlags,
         FileInfoTimeout,
-        MaxFileNodes,
-        MaxFileSize,
+        MaxFsSize,
         SlowioMaxDelay,
         SlowioPercentDelay,
         SlowioRarefyDelay,
@@ -184,8 +188,8 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
 
     MountPoint = FspFileSystemMountPoint(MemfsFileSystem(Memfs));
 
-    info(L"%s -t %ld -n %ld -s %ld%s%s%s%s%s%s",
-        L"" PROGNAME, FileInfoTimeout, MaxFileNodes, MaxFileSize,
+    info(L"%s -t %ld -s %ld%s%s%s%s%s%s",
+        L"" PROGNAME, FileInfoTimeout, MaxFsSize,
         RootSddl ? L" -S " : L"", RootSddl ? RootSddl : L"",
         0 != VolumePrefix && L'\0' != VolumePrefix[0] ? L" -u " : L"",
         0 != VolumePrefix && L'\0' != VolumePrefix[0] ? VolumePrefix : L"",
@@ -202,6 +206,8 @@ exit:
 
 usage:
 	{
+        // TODO: Add ability to change volume label via CLI
+        // TODO: Ensure that the memory is never swapped out
 		static wchar_t usage[] = L""
 	        L"usage: %s OPTIONS\n"
 	        L"\n"
@@ -211,8 +217,7 @@ usage:
 	        L"    -i                  [case insensitive file system]\n"
 	        L"    -f                  [flush and purge cache on cleanup]\n"
 	        L"    -t FileInfoTimeout  [millis]\n"
-	        L"    -n MaxFileNodes\n"
-	        L"    -s MaxFileSize      [bytes]\n"
+	        L"    -s MaxFsSize        [bytes of maximum total memory size]\n"
 	        L"    -M MaxDelay         [maximum slow IO delay in millis]\n"
 	        L"    -P PercentDelay     [percent of slow IO to make pending]\n"
 	        L"    -R RarefyDelay      [adjust the rarity of pending slow IO]\n"
