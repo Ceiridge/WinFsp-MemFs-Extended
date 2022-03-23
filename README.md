@@ -40,7 +40,7 @@ options:
 1. Start a test memefs instance to see if it works (see example command above)
 1. Stop the test instance
 1. Copy `memefs-x64.exe` (and `memefs-x86.exe`) to your WinFsp installation directory (`C:\Program Files (x86)\WinFsp\bin\`)
-1. Create a WinFsp service by downloading and executing the [InstallMemefsService.reg]() file (64-bit only supported. For the 32-bit version, it has to be manually installed) \
+1. Create a WinFsp service by downloading and executing the [InstallMemefsService.reg](InstallMemefsService.reg) file (64-bit only supported. For the 32-bit version, it has to be manually installed) \
 	If you have installed WinFsp somewhere else, make sure to edit the executable path.
 1. Test the service by running this command in your WinFsp installation dir.: `launchctl-x64.exe start memefs64 test "" X:` (admin rights may be required)
 1. Verify that memefs is running with the drive letter X
