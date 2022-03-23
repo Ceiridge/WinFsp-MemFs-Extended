@@ -871,14 +871,17 @@ NTSTATUS MemfsFileNodeMapInsert(MEMFS_FILE_NODE_MAP* FileNodeMap, MEMFS_FILE_NOD
 }
 
 static inline
-VOID MemfsFileNodeMapRemove(MEMFS_FILE_NODE_MAP* FileNodeMap, MEMFS_FILE_NODE* FileNode)
+VOID MemfsFileNodeMapRemove(MEMFS_FILE_NODE_MAP* FileNodeMap, MEMFS_FILE_NODE* FileNode, BOOL ReportDeletedSize = TRUE)
 {
     if (FileNodeMap->erase(FileNode->FileName))
     {
         // memefs: Quickly report counter about deleted sectors
-        const UINT64 toBeDeletedSizes = FileNode->FileDataSectors.size() * (MEMEFS_SECTOR_SIZE + sizeof(BYTE*));
-        GlobalMemfs->AllocatedSizesToBeDeleted += toBeDeletedSizes;
-        GlobalMemfs->ToBeDeletedFileNodeSizes->insert_or_assign(FileNode, toBeDeletedSizes);
+        if (ReportDeletedSize)
+        {
+            const UINT64 toBeDeletedSizes = FileNode->FileDataSectors.size() * (MEMEFS_SECTOR_SIZE + sizeof(BYTE*));
+            GlobalMemfs->AllocatedSizesToBeDeleted += toBeDeletedSizes;
+            GlobalMemfs->ToBeDeletedFileNodeSizes->insert_or_assign(FileNode, toBeDeletedSizes);
+        }
 
         MemfsFileNodeMapTouchParent(FileNodeMap, FileNode);
         MemfsFileNodeDereference(FileNode);
@@ -1924,11 +1927,13 @@ static NTSTATUS Rename(FSP_FILE_SYSTEM* FileSystem,
     for (Index = 0; Context.Count > Index; Index++)
     {
         DescendantFileNode = Context.FileNodes[Index];
-        MemfsFileNodeMapRemove(Memfs->FileNodeMap, DescendantFileNode);
+        MemfsFileNodeMapRemove(Memfs->FileNodeMap, DescendantFileNode, FALSE);
+
         memmove(DescendantFileNode->FileName + NewFileNameLen,
             DescendantFileNode->FileName + FileNameLen,
             (wcslen(DescendantFileNode->FileName) + 1 - FileNameLen) * sizeof(WCHAR));
         memcpy(DescendantFileNode->FileName, NewFileName, NewFileNameLen * sizeof(WCHAR));
+
         Result = MemfsFileNodeMapInsert(Memfs->FileNodeMap, DescendantFileNode, &Inserted);
         if (!NT_SUCCESS(Result))
         {
