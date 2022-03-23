@@ -65,7 +65,9 @@ FSP_FSCTL_STATIC_ASSERT(MEMFS_MAX_PATH > MAX_PATH,
      /*
       * Define the MEMFS_SLOWIO macro to include delayed I/O response support.
       */
-#define MEMFS_SLOWIO
+// TODO: Fix SlowIo
+// memfs: SlowIo temporarily disabled
+// #define MEMFS_SLOWIO
 
       /*
        * Define the MEMFS_CONTROL macro to include DeviceControl support.
@@ -104,72 +106,145 @@ FSP_FSCTL_STATIC_ASSERT(MEMFS_MAX_PATH > MAX_PATH,
 #define MEMFS_SECTORS_PER_ALLOCATION_UNIT 1
 
 /*
- * Large Heap Support
+ * memefs: Sector Memory Support
  */
 
-typedef struct
+typedef std::vector<BYTE*> MEMEFS_SECTOR_VECTOR;
+constexpr SIZE_T MEMEFS_SECTOR_SIZE = MEMFS_SECTOR_SIZE;
+
+static inline
+SIZE_T SectorAlignSize(SIZE_T Size, BOOL AlignUp = TRUE)
 {
-    DWORD Options;
-    SIZE_T InitialSize;
-    SIZE_T MaximumSize;
-    SIZE_T Alignment;
-} LARGE_HEAP_INITIALIZE_PARAMS;
-static INIT_ONCE LargeHeapInitOnce = INIT_ONCE_STATIC_INIT;
-static HANDLE LargeHeap;
-static SIZE_T LargeHeapAlignment;
-static BOOL WINAPI LargeHeapInitOnceF(
-    PINIT_ONCE InitOnce, PVOID Parameter, PVOID* Context)
+    const SIZE_T remainder = Size % MEMEFS_SECTOR_SIZE;
+    if (remainder == 0) 
+    {
+        return Size;
+    }
+
+    return Size + (AlignUp ? MEMEFS_SECTOR_SIZE : 0) - remainder;
+}
+
+static inline
+UINT64 SectorGetSectorCount(SIZE_T AlignedSize)
 {
-    LARGE_HEAP_INITIALIZE_PARAMS* Params = (LARGE_HEAP_INITIALIZE_PARAMS*)Parameter;
-    LargeHeap = HeapCreate(Params->Options, Params->InitialSize, Params->MaximumSize);
-    LargeHeapAlignment = 0 != Params->Alignment ?
-        FSP_FSCTL_ALIGN_UP(Params->Alignment, 4096) :
-        16 * 4096;
+    return AlignedSize / MEMEFS_SECTOR_SIZE;
+}
+
+static inline
+BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, UINT64* AllocatedSectorsCounter, SIZE_T Size)
+{
+    const SIZE_T vectorSize = SectorVector->size();
+    const SIZE_T alignedSize = SectorAlignSize(Size);
+    const UINT64 wantedSectorCount = SectorGetSectorCount(alignedSize);
+
+    if (vectorSize < wantedSectorCount) // Allocate
+    {
+        const SIZE_T sectorDifference = wantedSectorCount - vectorSize;
+        SectorVector->resize(wantedSectorCount);
+        (*AllocatedSectorsCounter) += sectorDifference;
+
+        for (UINT64 i = vectorSize; i < wantedSectorCount; i++) 
+        {
+            try 
+            {
+                (*SectorVector)[i] = new BYTE[MEMEFS_SECTOR_SIZE];
+            }
+            catch(std::bad_alloc&)
+            {
+                // Deallocate again to old size after failed allocation
+                SectorReAllocate(SectorVector, AllocatedSectorsCounter, vectorSize * MEMEFS_SECTOR_SIZE);
+                return FALSE;
+            }
+        }
+    }
+    else if (vectorSize > wantedSectorCount) // Deallocate
+    {
+        for (UINT64 i = wantedSectorCount; i < vectorSize; i++)
+        {
+            delete[] (*SectorVector)[i];
+        }
+
+        (*AllocatedSectorsCounter) -= vectorSize - wantedSectorCount;
+        SectorVector->resize(wantedSectorCount);
+    }
+
     return TRUE;
 }
+
 static inline
-BOOLEAN LargeHeapInitialize(
-    DWORD Options,
-    SIZE_T InitialSize,
-    SIZE_T MaximumSize,
-    SIZE_T Alignment)
+BOOL SectorRead(PVOID Buffer, MEMEFS_SECTOR_VECTOR* SectorVector, SIZE_T Offset, SIZE_T Size)
 {
-    LARGE_HEAP_INITIALIZE_PARAMS Params;
-    Params.Options = Options;
-    Params.InitialSize = InitialSize;
-    Params.MaximumSize = MaximumSize;
-    Params.Alignment = Alignment;
-    InitOnceExecuteOnce(&LargeHeapInitOnce, LargeHeapInitOnceF, &Params, 0);
-    return 0 != LargeHeap;
-}
-static inline
-PVOID LargeHeapAlloc(SIZE_T Size)
-{
-    return HeapAlloc(LargeHeap, 0, FSP_FSCTL_ALIGN_UP(Size, LargeHeapAlignment));
-}
-static inline
-PVOID LargeHeapRealloc(PVOID Pointer, SIZE_T Size)
-{
-    if (0 != Pointer)
+    if (Size == 0) 
     {
-        if (0 != Size)
-            return HeapReAlloc(LargeHeap, 0, Pointer, FSP_FSCTL_ALIGN_UP(Size, LargeHeapAlignment));
-        else
-            return HeapFree(LargeHeap, 0, Pointer), 0;
+        return TRUE;
     }
-    else
+
+    const SIZE_T sectorCount = SectorVector->size();
+
+    const SIZE_T downAlignedOffset = SectorAlignSize(Offset, FALSE);
+    const UINT64 offsetSectorBegin = SectorGetSectorCount(downAlignedOffset);
+    const SIZE_T offsetOffset = Offset - downAlignedOffset;
+
+    const UINT64 sectorEnd = offsetSectorBegin + SectorGetSectorCount(SectorAlignSize(Size)) - 1;
+
+    if (offsetSectorBegin >= sectorCount || sectorEnd >= sectorCount || offsetOffset > MEMEFS_SECTOR_SIZE)
     {
-        if (0 != Size)
-            return HeapAlloc(LargeHeap, 0, FSP_FSCTL_ALIGN_UP(Size, LargeHeapAlignment));
-        else
-            return 0;
+        return FALSE;
     }
+
+    SIZE_T readBytes = min(Size, MEMEFS_SECTOR_SIZE - offsetOffset);
+    memcpy(Buffer, (*SectorVector)[offsetSectorBegin] + offsetOffset, readBytes);
+
+    for (UINT64 i = offsetSectorBegin + 1; i <= sectorEnd; i++) 
+    {
+        const SIZE_T readNow = min(MEMEFS_SECTOR_SIZE, Size - readBytes);
+
+        memcpy((PVOID)((ULONG_PTR)Buffer + readBytes), (*SectorVector)[i], readNow);
+        readBytes += readNow;
+    }
+
+    return TRUE;
 }
+
 static inline
-VOID LargeHeapFree(PVOID Pointer)
+BOOL SectorWrite(MEMEFS_SECTOR_VECTOR* SectorVector, PVOID Buffer, SIZE_T Offset, SIZE_T Size)
 {
-    if (0 != Pointer)
-        HeapFree(LargeHeap, 0, Pointer);
+    if (Size == 0)
+    {
+        return TRUE;
+    }
+
+    const SIZE_T sectorCount = SectorVector->size();
+
+    const SIZE_T downAlignedOffset = SectorAlignSize(Offset, FALSE);
+    const UINT64 offsetSectorBegin = SectorGetSectorCount(downAlignedOffset);
+    const SIZE_T offsetOffset = Offset - downAlignedOffset;
+
+    const UINT64 sectorEnd = offsetSectorBegin + SectorGetSectorCount(SectorAlignSize(Size)) - 1;
+
+    if (offsetSectorBegin >= sectorCount || sectorEnd >= sectorCount || offsetOffset > MEMEFS_SECTOR_SIZE)
+    {
+        return FALSE;
+    }
+
+    SIZE_T writtenBytes = min(Size, MEMEFS_SECTOR_SIZE - offsetOffset);
+    memcpy((*SectorVector)[offsetSectorBegin] + offsetOffset, Buffer, writtenBytes);
+
+    for (UINT64 i = offsetSectorBegin + 1; i <= sectorEnd; i++)
+    {
+        const SIZE_T writeNow = min(MEMEFS_SECTOR_SIZE, Size - writtenBytes);
+
+        memcpy((*SectorVector)[i], (PVOID)((ULONG_PTR)Buffer + writtenBytes), writeNow);
+        writtenBytes += writeNow;
+    }
+
+    return TRUE;
+}
+
+static inline
+BOOL SectorFree(MEMEFS_SECTOR_VECTOR* SectorVector, UINT64* AllocatedSectorsCounter)
+{
+    return SectorReAllocate(SectorVector, AllocatedSectorsCounter, 0);
 }
 
 /*
@@ -299,7 +374,8 @@ typedef struct _MEMFS_FILE_NODE
     FSP_FSCTL_FILE_INFO FileInfo;
     SIZE_T FileSecuritySize;
     PVOID FileSecurity;
-    PVOID FileData;
+    // memefs: Sectors instead of LargeHeap
+    MEMEFS_SECTOR_VECTOR FileDataSectors;
 #if defined(MEMFS_REPARSE_POINTS)
     SIZE_T ReparseDataSize;
     PVOID ReparseData;
@@ -330,6 +406,8 @@ typedef struct _MEMFS
 {
     FSP_FILE_SYSTEM* FileSystem;
     MEMFS_FILE_NODE_MAP* FileNodeMap;
+    // memefs: Counter to track allocated memory
+    UINT64 AllocatedSectors;
     // memefs: MaxFsSize instead of max. file nodes and individual limits
     UINT64 MaxFsSize;
     UINT64 CachedMaxFsSize;
@@ -345,27 +423,27 @@ typedef struct _MEMFS
     WCHAR VolumeLabel[32];
 } MEMFS;
 
+// memfs: Use static global Memfs instance for easier access
+static MEMFS* GlobalMemfs = 0;
+
 // memefs: Get the all file sizes and the node map size
 static inline
 UINT64 MemefsGetUsedTotalSize(MEMFS* Memfs) {
-    // TODO: To be used later
-    //const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE));
+    const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE));
     // EA node map is ignored, because it is insignificant
 
-    // TODO: Remove this memory query and use an internal counter instead
-    PROCESS_MEMORY_COUNTERS_EX memoryCounters{};
-    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&memoryCounters, sizeof(memoryCounters));
-    return max(memoryCounters.WorkingSetSize, memoryCounters.PrivateUsage);
+    const SIZE_T sectorSizes = Memfs->AllocatedSectors * (MEMEFS_SECTOR_SIZE + sizeof(BYTE*));
+    return nodeMapSize + sectorSizes;
 }
 
 // memefs: This is required to update the maximum total size according to the available RAM that is left
 static inline
 UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
 {
-	if (Memfs->MaxFsSize != 0)
+    if (Memfs->MaxFsSize != 0)
     {
         return Memfs->MaxFsSize;
-	}
+    }
 
     const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs);
     const UINT64 currentTicks = GetTickCount64();
@@ -382,7 +460,7 @@ UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
         return 0;
     }
 
-	// TODO: Check whether it should be limited by physical or virtual memory
+    // TODO: Check whether it should be limited by physical or virtual memory
     const UINT64 availMemorySize = min(memoryStatus.ullAvailPhys, memoryStatus.ullAvailVirtual);
 
     Memfs->CachedMaxFsSize = availMemorySize;
@@ -395,7 +473,7 @@ static inline
 UINT64 MemefsGetAvailableTotalSize(MEMFS* Memfs)
 {
     const UINT64 totalSize = MemefsGetMaxTotalSize(Memfs);
-	const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs);
+    const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs);
 
     if(usedSize >= totalSize) {
         return 0;
@@ -454,7 +532,8 @@ VOID MemfsFileNodeDelete(MEMFS_FILE_NODE* FileNode)
 #if defined(MEMFS_REPARSE_POINTS)
     free(FileNode->ReparseData);
 #endif
-    LargeHeapFree(FileNode->FileData);
+    // memfs: SectorFree
+    SectorFree(&FileNode->FileDataSectors, &GlobalMemfs->AllocatedSectors);
     free(FileNode->FileSecurity);
     free(FileNode);
 }
@@ -1250,8 +1329,7 @@ static NTSTATUS Create(FSP_FILE_SYSTEM* FileSystem,
     FileNode->FileInfo.AllocationSize = AllocationSize;
     if (0 != FileNode->FileInfo.AllocationSize)
     {
-        FileNode->FileData = LargeHeapAlloc((size_t)FileNode->FileInfo.AllocationSize);
-        if (0 == FileNode->FileData)
+        if (!SectorReAllocate(&FileNode->FileDataSectors, &Memfs->AllocatedSectors, FileNode->FileInfo.AllocationSize))
         {
             MemfsFileNodeDelete(FileNode);
             return STATUS_INSUFFICIENT_RESOURCES;
@@ -1358,7 +1436,8 @@ static NTSTATUS Overwrite(FSP_FILE_SYSTEM* FileSystem,
     for (Index = 0; Context.Count > Index; Index++)
     {
         // TODO: This is not supported yet in the stable release
-        //LONG RefCount = FspInterlockedLoad32((INT32*)&Context.FileNodes[Index]->RefCount);
+        // memefs: Unsupported FspInterlockedLoad32
+        // LONG RefCount = FspInterlockedLoad32((INT32*)&Context.FileNodes[Index]->RefCount);
         LONG RefCount = Context.FileNodes[Index]->RefCount;
         MemoryBarrier(); // Remove this barrier in the future
         if (2 >= RefCount)
@@ -1498,7 +1577,12 @@ static NTSTATUS Read(FSP_FILE_SYSTEM* FileSystem,
     SlowioSnooze(FileSystem);
 #endif
 
-    memcpy(Buffer, (PUINT8)FileNode->FileData + Offset, (size_t)(EndOffset - Offset));
+    // memefs: Read from sector
+    if (!SectorRead(Buffer, &FileNode->FileDataSectors, Offset, EndOffset - Offset))
+    {
+        return STATUS_UNSUCCESSFUL;
+    }
+    // memcpy(Buffer, (PUINT8)FileNode->FileData + Offset, (size_t)(EndOffset - Offset));
 
     *PBytesTransferred = (ULONG)(EndOffset - Offset);
 
@@ -1572,7 +1656,12 @@ static NTSTATUS Write(FSP_FILE_SYSTEM* FileSystem,
     SlowioSnooze(FileSystem);
 #endif
 
-    memcpy((PUINT8)FileNode->FileData + Offset, Buffer, (size_t)(EndOffset - Offset));
+    // memefs: Write to sector
+    if (!SectorWrite(&FileNode->FileDataSectors, Buffer, Offset, EndOffset - Offset))
+    {
+        return STATUS_UNSUCCESSFUL;
+    }
+    // memcpy((PUINT8)FileNode->FileData + Offset, Buffer, (size_t)(EndOffset - Offset));
 
     *PBytesTransferred = (ULONG)(EndOffset - Offset);
     MemfsFileNodeGetFileInfo(FileNode, FileInfo);
@@ -1661,11 +1750,8 @@ static NTSTATUS SetFileSizeInternal(FSP_FILE_SYSTEM* FileSystem,
             if (NewSize > MemefsGetAvailableTotalSize(Memfs))
                 return STATUS_DISK_FULL;
 
-            PVOID FileData = LargeHeapRealloc(FileNode->FileData, (size_t)NewSize);
-            if (0 == FileData && 0 != NewSize)
+            if (!SectorReAllocate(&FileNode->FileDataSectors, &Memfs->AllocatedSectors, (SIZE_T)NewSize))
                 return STATUS_INSUFFICIENT_RESOURCES;
-
-            FileNode->FileData = FileData;
 
             FileNode->FileInfo.AllocationSize = NewSize;
             if (FileNode->FileInfo.FileSize > NewSize)
@@ -1686,9 +1772,10 @@ static NTSTATUS SetFileSizeInternal(FSP_FILE_SYSTEM* FileSystem,
                     return Result;
             }
 
-            if (FileNode->FileInfo.FileSize < NewSize)
-                memset((PUINT8)FileNode->FileData + FileNode->FileInfo.FileSize, 0,
-                    (size_t)(NewSize - FileNode->FileInfo.FileSize));
+            // memefs: No null-initialization?
+            // if (FileNode->FileInfo.FileSize < NewSize)
+            //    memset((PUINT8)FileNode->FileData + FileNode->FileInfo.FileSize, 0,
+            //        (size_t)(NewSize - FileNode->FileInfo.FileSize));
             FileNode->FileInfo.FileSize = NewSize;
         }
     }
@@ -2395,10 +2482,6 @@ NTSTATUS MemfsCreateFunnel(
 
     *PMemfs = 0;
 
-    Result = MemfsHeapConfigure(0, 0, 0);
-    if (!NT_SUCCESS(Result))
-        return Result;
-
     if (0 == RootSddl)
         RootSddl = L"O:BAG:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;WD)";
     if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(RootSddl, SDDL_REVISION_1,
@@ -2481,6 +2564,7 @@ NTSTATUS MemfsCreateFunnel(
     }
 
     Memfs->FileSystem->UserContext = Memfs;
+    GlobalMemfs = Memfs;
 
     PWSTR volumeLabel = L"MEMEFS";
     if (VolumeLabel)
@@ -2568,10 +2652,4 @@ VOID MemfsStop(MEMFS* Memfs)
 FSP_FILE_SYSTEM* MemfsFileSystem(MEMFS* Memfs)
 {
     return Memfs->FileSystem;
-}
-
-NTSTATUS MemfsHeapConfigure(SIZE_T InitialSize, SIZE_T MaximumSize, SIZE_T Alignment)
-{
-    return LargeHeapInitialize(0, InitialSize, MaximumSize, LargeHeapAlignment) ?
-        STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }

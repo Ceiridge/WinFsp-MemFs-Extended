@@ -213,7 +213,6 @@ exit:
 
 usage:
 	{
-        // TODO: Add ability to change volume label via CLI
         // TODO: Ensure that the memory is never swapped out
 		static wchar_t usage[] = L""
 	        L"usage: %s OPTIONS\n"
