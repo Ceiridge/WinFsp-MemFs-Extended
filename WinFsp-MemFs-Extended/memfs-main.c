@@ -62,6 +62,7 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
     PWSTR MountPoint = 0;
     PWSTR VolumePrefix = 0;
     PWSTR RootSddl = 0;
+    PWSTR VolumeLabel = 0;
     HANDLE DebugLogHandle = INVALID_HANDLE_VALUE;
     MEMFS* Memfs = 0;
     NTSTATUS Result;
@@ -116,6 +117,9 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
             if (0 != VolumePrefix && L'\0' != VolumePrefix[0])
                 Flags = MemfsNet;
             break;
+        case L'l':
+            argtos(VolumeLabel);
+            break;
         default:
             goto usage;
         }
@@ -158,6 +162,7 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
         SlowioRarefyDelay,
         FileSystemName,
         VolumePrefix,
+        VolumeLabel,
         RootSddl,
         &Memfs);
     if (!NT_SUCCESS(Result))
@@ -188,12 +193,14 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
 
     MountPoint = FspFileSystemMountPoint(MemfsFileSystem(Memfs));
 
-    info(L"%s -t %ld -s %ld%s%s%s%s%s%s",
+    info(L"%s -t %ld -s %ld%s%s%s%s%s%s%s%s",
         L"" PROGNAME, FileInfoTimeout, MaxFsSize,
         RootSddl ? L" -S " : L"", RootSddl ? RootSddl : L"",
         0 != VolumePrefix && L'\0' != VolumePrefix[0] ? L" -u " : L"",
         0 != VolumePrefix && L'\0' != VolumePrefix[0] ? VolumePrefix : L"",
-        MountPoint ? L" -m " : L"", MountPoint ? MountPoint : L"");
+        MountPoint ? L" -m " : L"", MountPoint ? MountPoint : L"",
+        0 != VolumeLabel && L'\0' != VolumeLabel[0] ? L" -l " : L"",
+        0 != VolumeLabel && L'\0' != VolumeLabel[0] ? VolumeLabel : L"");
 
     Service->UserContext = Memfs;
     Result = STATUS_SUCCESS;
@@ -224,7 +231,8 @@ usage:
 	        L"    -F FileSystemName\n"
 	        L"    -S RootSddl         [file rights: FA, etc; NO generic rights: GA, etc.]\n"
 	        L"    -u \\Server\\Share    [UNC prefix (single backslash)]\n"
-	        L"    -m MountPoint       [X:|* (required if no UNC prefix)]\n";
+            L"    -m MountPoint       [X:|* (required if no UNC prefix)]\n"
+			L"    -l VolumeLabel      [optional volume label name]\n";
 
 	    fail(usage,L"" PROGNAME);
 	}

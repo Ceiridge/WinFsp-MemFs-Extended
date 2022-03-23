@@ -62,6 +62,7 @@ extern "C" {
         ULONG SlowioRarefyDelay,
         PWSTR FileSystemName,
         PWSTR VolumePrefix,
+        PWSTR VolumeLabel,
         PWSTR RootSddl,
         MEMFS** PMemfs);
     VOID MemfsDelete(MEMFS* Memfs);

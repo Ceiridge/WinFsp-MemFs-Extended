@@ -380,10 +380,11 @@ UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
 // memefs: Get the all file sizes and the node map size
 static inline
 UINT64 MemefsGetUsedTotalSize(MEMFS* Memfs) {
-    // To be used later
+    // TODO: To be used later
 	//const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE));
     // EA node map is ignored, because it is insignificant
 
+    // TODO: Remove this memory query and use an internal counter instead
     PROCESS_MEMORY_COUNTERS_EX memoryCounters;
     GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&memoryCounters, sizeof(memoryCounters));
     return max(memoryCounters.WorkingSetSize, memoryCounters.PrivateUsage);
@@ -1040,11 +1041,6 @@ static NTSTATUS GetVolumeInfo(FSP_FILE_SYSTEM* FileSystem,
     FSP_FSCTL_VOLUME_INFO* VolumeInfo)
 {
     MEMFS* Memfs = (MEMFS*)FileSystem->UserContext;
-
-    // TODO: Remove
-    // VolumeInfo->TotalSize = Memfs->MaxFileNodes * (UINT64)Memfs->MaxFileSize;
-    // VolumeInfo->FreeSize = (Memfs->MaxFileNodes - MemfsFileNodeMapCount(Memfs->FileNodeMap)) *
-        //(UINT64)Memfs->MaxFileSize;
 
     VolumeInfo->TotalSize = MemefsGetMaxTotalSize(Memfs);
     VolumeInfo->FreeSize = MemefsGetAvailableTotalSize(Memfs);
@@ -2378,6 +2374,7 @@ NTSTATUS MemfsCreateFunnel(
     ULONG SlowioRarefyDelay,
     PWSTR FileSystemName,
     PWSTR VolumePrefix,
+    PWSTR VolumeLabel,
     PWSTR RootSddl,
     MEMFS** PMemfs)
 {
@@ -2483,8 +2480,15 @@ NTSTATUS MemfsCreateFunnel(
     }
 
     Memfs->FileSystem->UserContext = Memfs;
-    Memfs->VolumeLabelLength = sizeof L"MEMEFS" - sizeof(WCHAR);
-    memcpy(Memfs->VolumeLabel, L"MEMEFS", Memfs->VolumeLabelLength);
+
+    PWSTR volumeLabel = L"MEMEFS";
+    if (VolumeLabel)
+    {
+        volumeLabel = VolumeLabel;
+    }
+
+    Memfs->VolumeLabelLength = (UINT16)wcsnlen_s(volumeLabel, 31) * sizeof(WCHAR);
+    memcpy_s(Memfs->VolumeLabel, sizeof(Memfs->VolumeLabel), volumeLabel, Memfs->VolumeLabelLength);
 
 #if 0
     FspFileSystemSetOperationGuardStrategy(Memfs->FileSystem,
