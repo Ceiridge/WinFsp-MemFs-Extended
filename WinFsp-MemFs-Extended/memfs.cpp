@@ -107,8 +107,17 @@ FSP_FSCTL_STATIC_ASSERT(MEMFS_MAX_PATH > MAX_PATH,
  * memefs: Sector Memory Support
  */
 
-typedef std::vector<BYTE*> MEMEFS_SECTOR_VECTOR;
-constexpr SIZE_T MEMEFS_SECTOR_SIZE = MEMFS_SECTOR_SIZE;
+constexpr SIZE_T MEMEFS_SECTOR_SIZE = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
+
+// Make sure that this struct is never padded, no matter what sector size is used
+#pragma pack(push, memefsNoPadding, 1)
+struct MEMEFS_SECTOR {
+    BYTE Bytes[MEMEFS_SECTOR_SIZE];
+};
+#pragma pack(pop, memefsNoPadding)
+
+typedef std::vector<MEMEFS_SECTOR*> MEMEFS_SECTOR_VECTOR;
+static HANDLE MEMEFS_GLOBAL_HEAP{};
 
 static inline
 SIZE_T SectorAlignSize(SIZE_T Size, BOOL AlignUp = TRUE)
@@ -126,6 +135,18 @@ static inline
 UINT64 SectorGetSectorCount(SIZE_T AlignedSize)
 {
     return AlignedSize / MEMEFS_SECTOR_SIZE;
+}
+
+static inline
+BOOL SectorInitialize()
+{
+	if (MEMEFS_GLOBAL_HEAP != 0)
+    {
+        return FALSE;
+	}
+
+    MEMEFS_GLOBAL_HEAP = HeapCreate(0, 0, 0);
+    return TRUE;
 }
 
 static inline
@@ -165,7 +186,16 @@ BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVect
         {
             try 
             {
-                (*SectorVector)[i] = new BYTE[MEMEFS_SECTOR_SIZE];
+                // Old method for the main process heap
+                // (*SectorVector)[i] = new MEMEFS_SECTOR();
+
+                MEMEFS_SECTOR* allocPtr = (MEMEFS_SECTOR*)HeapAlloc(MEMEFS_GLOBAL_HEAP, 0, sizeof(MEMEFS_SECTOR));
+                if (allocPtr == 0) 
+                {
+                    throw std::bad_alloc();
+                }
+
+            	(*SectorVector)[i] = allocPtr;
             }
             catch(std::bad_alloc&)
             {
@@ -182,7 +212,7 @@ BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVect
     {
         for (UINT64 i = wantedSectorCount; i < vectorSize; i++)
         {
-            delete[] (*SectorVector)[i];
+            HeapFree(MEMEFS_GLOBAL_HEAP, 0, (*SectorVector)[i]);
         }
 
         SectorVectorMutex->lock();
@@ -218,13 +248,13 @@ BOOL SectorRead(PVOID Buffer, MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* Se
     }
 
     SIZE_T readBytes = min(Size, MEMEFS_SECTOR_SIZE - offsetOffset);
-    memcpy(Buffer, (*SectorVector)[offsetSectorBegin] + offsetOffset, readBytes);
+    memcpy(Buffer, (*SectorVector)[offsetSectorBegin]->Bytes + offsetOffset, readBytes);
 
     for (UINT64 i = offsetSectorBegin + 1; i <= sectorEnd; i++) 
     {
         const SIZE_T readNow = min(MEMEFS_SECTOR_SIZE, Size - readBytes);
 
-        memcpy((PVOID)((ULONG_PTR)Buffer + readBytes), (*SectorVector)[i], readNow);
+        memcpy((PVOID)((ULONG_PTR)Buffer + readBytes), (*SectorVector)[i]->Bytes, readNow);
         readBytes += readNow;
     }
 
@@ -255,13 +285,13 @@ BOOL SectorWrite(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMut
     }
 
     SIZE_T writtenBytes = min(Size, MEMEFS_SECTOR_SIZE - offsetOffset);
-    memcpy((*SectorVector)[offsetSectorBegin] + offsetOffset, Buffer, writtenBytes);
+    memcpy((*SectorVector)[offsetSectorBegin]->Bytes + offsetOffset, Buffer, writtenBytes);
 
     for (UINT64 i = offsetSectorBegin + 1; i <= sectorEnd; i++)
     {
         const SIZE_T writeNow = min(MEMEFS_SECTOR_SIZE, Size - writtenBytes);
 
-        memcpy((*SectorVector)[i], (PVOID)((ULONG_PTR)Buffer + writtenBytes), writeNow);
+        memcpy((*SectorVector)[i]->Bytes, (PVOID)((ULONG_PTR)Buffer + writtenBytes), writeNow);
         writtenBytes += writeNow;
     }
 
@@ -463,7 +493,7 @@ UINT64 MemefsGetUsedTotalSize(MEMFS* Memfs) {
     const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE) + sizeof(std::mutex));
     // EA node map is ignored, because it is insignificant
 
-    const SIZE_T sectorSizes = Memfs->AllocatedSectors * (MEMEFS_SECTOR_SIZE + sizeof(BYTE*));
+    const SIZE_T sectorSizes = Memfs->AllocatedSectors * (sizeof(MEMEFS_SECTOR) + sizeof(MEMEFS_SECTOR*));
     return nodeMapSize + sectorSizes;
 }
 
@@ -506,7 +536,8 @@ UINT64 MemefsGetAvailableTotalSize(MEMFS* Memfs)
     const UINT64 totalSize = MemefsGetMaxTotalSize(Memfs);
     const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs);
 
-    if(usedSize >= totalSize) {
+    if (usedSize >= totalSize)
+    {
         return 0;
     }
 
@@ -567,7 +598,7 @@ VOID MemfsFileNodeDelete(MEMFS_FILE_NODE* FileNode)
     free(FileNode->ReparseData);
 #endif
 
-	// memefs: SectorFree
+    // memefs: SectorFree
     SectorFree(&FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, &GlobalMemfs->AllocatedSectors);
 
     const auto mapIterator = GlobalMemfs->ToBeDeletedFileNodeSizes->find(FileNode);
@@ -576,7 +607,7 @@ VOID MemfsFileNodeDelete(MEMFS_FILE_NODE* FileNode)
         GlobalMemfs->ToBeDeletedFileNodeSizes->erase(mapIterator->first);
     }
 
-	FileNode->FileDataSectors.~vector();
+    FileNode->FileDataSectors.~vector();
     delete FileNode->FileDataSectorsMutex;
 
 
@@ -878,7 +909,7 @@ VOID MemfsFileNodeMapRemove(MEMFS_FILE_NODE_MAP* FileNodeMap, MEMFS_FILE_NODE* F
         // memefs: Quickly report counter about deleted sectors
         if (ReportDeletedSize)
         {
-            const UINT64 toBeDeletedSizes = FileNode->FileDataSectors.size() * (MEMEFS_SECTOR_SIZE + sizeof(BYTE*));
+            const UINT64 toBeDeletedSizes = FileNode->FileDataSectors.size() * (sizeof(MEMEFS_SECTOR) + sizeof(MEMEFS_SECTOR*));
             GlobalMemfs->AllocatedSizesToBeDeleted += toBeDeletedSizes;
             GlobalMemfs->ToBeDeletedFileNodeSizes->insert_or_assign(FileNode, toBeDeletedSizes);
         }
@@ -1810,7 +1841,9 @@ static NTSTATUS SetFileSizeInternal(FSP_FILE_SYSTEM* FileSystem,
     {
         if (FileNode->FileInfo.AllocationSize != NewSize)
         {
-            if (NewSize > MemefsGetAvailableTotalSize(Memfs))
+            // memefs: Sector Reallocate
+            const SIZE_T oldSize = FileNode->FileDataSectors.size() * (sizeof(MEMEFS_SECTOR) + sizeof(MEMEFS_SECTOR*));
+            if (NewSize - oldSize + MemefsGetUsedTotalSize(Memfs) > MemefsGetMaxTotalSize(Memfs))
                 return STATUS_DISK_FULL;
 
             if (!SectorReAllocate(&FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, &Memfs->AllocatedSectors, (SIZE_T)NewSize))
@@ -2564,6 +2597,7 @@ NTSTATUS MemfsCreateFunnel(
     AllocationUnit = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
     // memefs: MaxFsSize
     Memfs->MaxFsSize = MaxFsSize;
+    SectorInitialize();
 
 #ifdef MEMFS_SLOWIO
     Memfs->SlowioMaxDelay = SlowioMaxDelay;
