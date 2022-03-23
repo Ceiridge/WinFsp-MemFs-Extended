@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\WinFsp\Services\memefs64]
+"Executable"="C:\\Program Files (x86)\\WinFsp\\bin\\memefs-x64.exe"
+"CommandLine"="-i -F NTFS -l Ram -u %1 -m %2"
+"Security"="D:P(A;;RPWPLC;;;WD)"
+"JobControl"=dword:00000001
+
