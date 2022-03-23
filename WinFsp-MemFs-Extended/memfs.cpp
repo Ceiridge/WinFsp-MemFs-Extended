@@ -345,6 +345,19 @@ typedef struct _MEMFS
     WCHAR VolumeLabel[32];
 } MEMFS;
 
+// memefs: Get the all file sizes and the node map size
+static inline
+UINT64 MemefsGetUsedTotalSize(MEMFS* Memfs) {
+    // TODO: To be used later
+    //const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE));
+    // EA node map is ignored, because it is insignificant
+
+    // TODO: Remove this memory query and use an internal counter instead
+    PROCESS_MEMORY_COUNTERS_EX memoryCounters{};
+    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&memoryCounters, sizeof(memoryCounters));
+    return max(memoryCounters.WorkingSetSize, memoryCounters.PrivateUsage);
+}
+
 // memefs: This is required to update the maximum total size according to the available RAM that is left
 static inline
 UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
@@ -354,7 +367,7 @@ UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
         return Memfs->MaxFsSize;
 	}
 
-    const UINT64 usedSize = MemefsGetMaxTotalSize(Memfs);
+    const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs);
     const UINT64 currentTicks = GetTickCount64();
 
     // Limit calls to GlobalMemoryStatusEx with a 100ms cooldown to improve performance
@@ -362,7 +375,8 @@ UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
         return Memfs->CachedMaxFsSize + usedSize;
     }
 
-    MEMORYSTATUSEX memoryStatus;
+    MEMORYSTATUSEX memoryStatus{};
+    memoryStatus.dwLength = sizeof(MEMORYSTATUSEX);
     if (!GlobalMemoryStatusEx(&memoryStatus)) 
     {
         return 0;
@@ -375,19 +389,6 @@ UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
     Memfs->LastCacheTime = currentTicks;
 
     return availMemorySize + usedSize;
-}
-
-// memefs: Get the all file sizes and the node map size
-static inline
-UINT64 MemefsGetUsedTotalSize(MEMFS* Memfs) {
-    // TODO: To be used later
-	//const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE));
-    // EA node map is ignored, because it is insignificant
-
-    // TODO: Remove this memory query and use an internal counter instead
-    PROCESS_MEMORY_COUNTERS_EX memoryCounters;
-    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&memoryCounters, sizeof(memoryCounters));
-    return max(memoryCounters.WorkingSetSize, memoryCounters.PrivateUsage);
 }
 
 static inline

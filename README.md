@@ -10,6 +10,7 @@
 ## CLI
 ```
 usage: memefs OPTIONS
+simple example: memefs -i -F NTFS -u "" -m R:
 
 options:
     -d DebugFlags       [-1: enable all debug logs]
