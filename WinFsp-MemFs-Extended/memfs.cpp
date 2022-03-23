@@ -980,9 +980,12 @@ static NTSTATUS GetVolumeInfo(FSP_FILE_SYSTEM* FileSystem,
 {
     MEMFS* Memfs = (MEMFS*)FileSystem->UserContext;
 
-    VolumeInfo->TotalSize = Memfs->MaxFileNodes * (UINT64)Memfs->MaxFileSize;
-    VolumeInfo->FreeSize = (Memfs->MaxFileNodes - MemfsFileNodeMapCount(Memfs->FileNodeMap)) *
-        (UINT64)Memfs->MaxFileSize;
+    // TODO: Remove
+    // VolumeInfo->TotalSize = Memfs->MaxFileNodes * (UINT64)Memfs->MaxFileSize;
+    // VolumeInfo->FreeSize = (Memfs->MaxFileNodes - MemfsFileNodeMapCount(Memfs->FileNodeMap)) *
+        //(UINT64)Memfs->MaxFileSize;
+
+
     VolumeInfo->VolumeLabelLength = Memfs->VolumeLabelLength;
     memcpy(VolumeInfo->VolumeLabel, Memfs->VolumeLabel, Memfs->VolumeLabelLength);
 
@@ -1000,13 +1003,8 @@ static NTSTATUS SetVolumeLabel(FSP_FILE_SYSTEM* FileSystem,
         Memfs->VolumeLabelLength = sizeof Memfs->VolumeLabel;
     memcpy(Memfs->VolumeLabel, VolumeLabel, Memfs->VolumeLabelLength);
 
-    VolumeInfo->TotalSize = Memfs->MaxFileNodes * Memfs->MaxFileSize;
-    VolumeInfo->FreeSize =
-        (Memfs->MaxFileNodes - MemfsFileNodeMapCount(Memfs->FileNodeMap)) * Memfs->MaxFileSize;
-    VolumeInfo->VolumeLabelLength = Memfs->VolumeLabelLength;
-    memcpy(VolumeInfo->VolumeLabel, Memfs->VolumeLabel, Memfs->VolumeLabelLength);
-
-    return STATUS_SUCCESS;
+    // memefs: Call GetVolumeInfo to avoid code duplication
+    return GetVolumeInfo(FileSystem, VolumeInfo);
 }
 
 static NTSTATUS GetSecurityByName(FSP_FILE_SYSTEM* FileSystem,
