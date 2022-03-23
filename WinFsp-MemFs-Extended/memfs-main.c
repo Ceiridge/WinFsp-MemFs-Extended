@@ -229,7 +229,7 @@ usage:
 	        L"    -R RarefyDelay      [adjust the rarity of pending slow IO]\n"
 	        L"    -F FileSystemName\n"
 	        L"    -S RootSddl         [file rights: FA, etc; NO generic rights: GA, etc.]\n"
-	        L"    -u \\Server\\Share    [UNC prefix (single backslash)]\n"
+	        L"    -u \\Server\\Share  [UNC prefix (single backslash)]\n"
             L"    -m MountPoint       [X:|* (required if no UNC prefix)]\n"
 			L"    -l VolumeLabel      [optional volume label name]\n";
 
