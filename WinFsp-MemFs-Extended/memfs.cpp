@@ -140,10 +140,10 @@ UINT64 SectorGetSectorCount(SIZE_T AlignedSize)
 static inline
 BOOL SectorInitialize()
 {
-	if (MEMEFS_GLOBAL_HEAP != 0)
+    if (MEMEFS_GLOBAL_HEAP != 0)
     {
         return FALSE;
-	}
+    }
 
     MEMEFS_GLOBAL_HEAP = HeapCreate(0, 0, 0);
     return TRUE;
@@ -195,7 +195,7 @@ BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVect
                     throw std::bad_alloc();
                 }
 
-            	(*SectorVector)[i] = allocPtr;
+                (*SectorVector)[i] = allocPtr;
             }
             catch(std::bad_alloc&)
             {
