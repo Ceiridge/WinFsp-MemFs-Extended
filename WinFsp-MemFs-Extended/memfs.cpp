@@ -1,8 +1,3 @@
-/**
- * @file memfs.cpp
- *
- * @copyright 2015-2022 Bill Zissimopoulos
- */
  /*
   * This file is part of WinFsp.
   *
@@ -27,6 +22,7 @@
 #include <map>
 #include <unordered_map>
 #include <mutex>
+#include <shared_mutex>
 
   /* SLOWIO */
 #include <thread>
@@ -39,7 +35,7 @@ FSP_FSCTL_STATIC_ASSERT(MEMFS_MAX_PATH > MAX_PATH,
  * Define the MEMFS_STANDALONE macro when building MEMFS as a standalone file system.
  * This macro should be defined in the Visual Studio project settings, Makefile, etc.
  */
- //#define MEMFS_STANDALONE
+#define MEMFS_STANDALONE
 
  /*
   * Define the MEMFS_NAME_NORMALIZATION macro to include name normalization support.
@@ -82,6 +78,12 @@ FSP_FSCTL_STATIC_ASSERT(MEMFS_MAX_PATH > MAX_PATH,
          */
 #define MEMFS_WSL
 
+/*
+ * Use locks to ensure heap reinitialization thread safety
+ * Disabled, because it does not seem to be a problem
+ */
+// #define MEMEFS_HEAP_LOCKS
+
          /*
           * Define the MEMFS_REJECT_EARLY_IRP macro to reject IRP's sent
           * to the file system prior to the dispatcher being started.
@@ -117,7 +119,15 @@ struct MEMEFS_SECTOR {
 #pragma pack(pop, memefsNoPadding)
 
 typedef std::vector<MEMEFS_SECTOR*> MEMEFS_SECTOR_VECTOR;
+
 static HANDLE MEMEFS_GLOBAL_HEAP{};
+
+#ifdef MEMEFS_HEAP_LOCKS
+typedef std::shared_mutex MEMEFS_LOCK;
+typedef std::unique_lock<MEMEFS_LOCK> MEMEFS_BLOCKING_LOCK;
+typedef std::shared_lock<MEMEFS_LOCK> MEMEFS_USAGE_LOCK;
+static MEMEFS_LOCK MEMEFS_SECTOR_HEAP_LOCK;
+#endif
 
 static inline
 SIZE_T SectorAlignSize(SIZE_T Size, BOOL AlignUp = TRUE)
@@ -138,11 +148,18 @@ UINT64 SectorGetSectorCount(SIZE_T AlignedSize)
 }
 
 static inline
-BOOL SectorInitialize()
+BOOL SectorInitialize(BOOL CanDestroy = FALSE)
 {
     if (MEMEFS_GLOBAL_HEAP != 0)
     {
-        return FALSE;
+        if (CanDestroy)
+        {
+            HeapDestroy(MEMEFS_GLOBAL_HEAP);
+        }
+        else
+        {
+            return FALSE;
+        }
     }
 
     MEMEFS_GLOBAL_HEAP = HeapCreate(0, 0, 0);
@@ -150,8 +167,12 @@ BOOL SectorInitialize()
 }
 
 static inline
-BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMutex, UINT64* AllocatedSectorsCounter, SIZE_T Size)
+BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMutex, volatile UINT64* AllocatedSectorsCounter, SIZE_T Size)
 {
+#ifdef MEMEFS_HEAP_LOCKS
+    MEMEFS_USAGE_LOCK usageLock(MEMEFS_SECTOR_HEAP_LOCK);
+#endif
+
     SectorVectorMutex->lock();
     const SIZE_T vectorSize = SectorVector->size();
     SectorVectorMutex->unlock();
@@ -163,7 +184,7 @@ BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVect
     if (vectorSize < wantedSectorCount) // Allocate
     {
         const SIZE_T sectorDifference = wantedSectorCount - vectorSize;
-        (*AllocatedSectorsCounter) += sectorDifference;
+        InterlockedExchangeAdd(AllocatedSectorsCounter, sectorDifference);
 
         SectorVectorMutex->lock();
         try
@@ -186,9 +207,6 @@ BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVect
         {
             try 
             {
-                // Old method for the main process heap
-                // (*SectorVector)[i] = new MEMEFS_SECTOR();
-
                 MEMEFS_SECTOR* allocPtr = (MEMEFS_SECTOR*)HeapAlloc(MEMEFS_GLOBAL_HEAP, 0, sizeof(MEMEFS_SECTOR));
                 if (allocPtr == 0) 
                 {
@@ -217,7 +235,7 @@ BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVect
 
         SectorVectorMutex->lock();
         SectorVector->resize(wantedSectorCount);
-        (*AllocatedSectorsCounter) -= vectorSize - wantedSectorCount;
+        InterlockedExchangeSubtract(AllocatedSectorsCounter, vectorSize - wantedSectorCount);
         SectorVectorMutex->unlock();
     }
 
@@ -231,6 +249,10 @@ BOOL SectorRead(PVOID Buffer, MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* Se
     {
         return TRUE;
     }
+
+#ifdef MEMEFS_HEAP_LOCKS
+    MEMEFS_USAGE_LOCK usageLock(MEMEFS_SECTOR_HEAP_LOCK);
+#endif
 
     SectorVectorMutex->lock();
     const SIZE_T sectorCount = SectorVector->size();
@@ -269,6 +291,10 @@ BOOL SectorWrite(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMut
         return TRUE;
     }
 
+#ifdef MEMEFS_HEAP_LOCKS
+    MEMEFS_USAGE_LOCK usageLock(MEMEFS_SECTOR_HEAP_LOCK);
+#endif
+
     SectorVectorMutex->lock();
     const SIZE_T sectorCount = SectorVector->size();
     SectorVectorMutex->unlock();
@@ -299,7 +325,7 @@ BOOL SectorWrite(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMut
 }
 
 static inline
-BOOL SectorFree(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMutex, UINT64* AllocatedSectorsCounter)
+BOOL SectorFree(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMutex, volatile UINT64* AllocatedSectorsCounter)
 {
     return SectorReAllocate(SectorVector, SectorVectorMutex, AllocatedSectorsCounter, 0);
 }
@@ -466,8 +492,8 @@ typedef struct _MEMFS
     FSP_FILE_SYSTEM* FileSystem;
     MEMFS_FILE_NODE_MAP* FileNodeMap;
     // memefs: Counter to track allocated memory
-    UINT64 AllocatedSectors;
-    UINT64 AllocatedSizesToBeDeleted;
+    volatile UINT64 AllocatedSectors;
+    volatile UINT64 AllocatedSizesToBeDeleted;
     std::map<MEMFS_FILE_NODE*, UINT64>* ToBeDeletedFileNodeSizes;
     // memefs: MaxFsSize instead of max. file nodes and individual limits
     UINT64 MaxFsSize;
@@ -545,6 +571,22 @@ UINT64 MemefsGetAvailableTotalSize(MEMFS* Memfs)
 }
 
 static inline
+BOOL MemefsIsFullyEmpty(MEMFS* Memfs)
+{
+    /*
+     * Old invalid method that checks file count that is also not in sync with WinFsp:
+     
+    if(FileNodeMap->size() == 1) // The root node always remains
+    {
+        const MEMFS_FILE_NODE* file = FileNodeMap->begin()->second;
+        return file->FileDataSectors.empty() && file->FileInfo.AllocationSize == 0;
+    }
+    */
+
+	return InterlockedExchangeAdd(&Memfs->AllocatedSectors, 0ULL) == 0;
+}
+
+static inline
 NTSTATUS MemfsFileNodeCreate(PWSTR FileName, MEMFS_FILE_NODE** PFileNode)
 {
     static UINT64 IndexNumber = 1;
@@ -609,6 +651,20 @@ VOID MemfsFileNodeDelete(MEMFS_FILE_NODE* FileNode)
 
     FileNode->FileDataSectors.~vector();
     delete FileNode->FileDataSectorsMutex;
+
+    // memefs: Delete heap if fully empty
+    if (MemefsIsFullyEmpty(GlobalMemfs))
+    {
+#ifdef MEMEFS_HEAP_LOCKS
+        MEMEFS_BLOCKING_LOCK blockLock(MEMEFS_SECTOR_HEAP_LOCK);
+#endif
+
+        // Check if still empty
+        if (MemefsIsFullyEmpty(GlobalMemfs))
+        {
+            SectorInitialize(TRUE);
+        }
+    }
 
 
     free(FileNode->FileSecurity);

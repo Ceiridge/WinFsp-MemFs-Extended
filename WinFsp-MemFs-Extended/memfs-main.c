@@ -1,8 +1,3 @@
-/**
- * @file memfs-main.c
- *
- * @copyright 2015-2022 Bill Zissimopoulos
- */
  /*
   * This file is part of WinFsp.
   *
