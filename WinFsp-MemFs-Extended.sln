@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinFsp-MemFs-Extended", "Wi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RandomFilesTester", "RandomFilesTester\RandomFilesTester.vcxproj", "{1CCD3B61-DDA5-4093-B1E4-E0742D9EC186}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Winfsp-Fsbench", "Winfsp-Fsbench\Winfsp-Fsbench.vcxproj", "{07264DB3-819A-49AD-A242-7107922AC612}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{1CCD3B61-DDA5-4093-B1E4-E0742D9EC186}.Release|x64.Build.0 = Release|x64
 		{1CCD3B61-DDA5-4093-B1E4-E0742D9EC186}.Release|x86.ActiveCfg = Release|Win32
 		{1CCD3B61-DDA5-4093-B1E4-E0742D9EC186}.Release|x86.Build.0 = Release|Win32
+		{07264DB3-819A-49AD-A242-7107922AC612}.Debug|x64.ActiveCfg = Debug|x64
+		{07264DB3-819A-49AD-A242-7107922AC612}.Debug|x64.Build.0 = Debug|x64
+		{07264DB3-819A-49AD-A242-7107922AC612}.Debug|x86.ActiveCfg = Debug|Win32
+		{07264DB3-819A-49AD-A242-7107922AC612}.Debug|x86.Build.0 = Debug|Win32
+		{07264DB3-819A-49AD-A242-7107922AC612}.Release|x64.ActiveCfg = Release|x64
+		{07264DB3-819A-49AD-A242-7107922AC612}.Release|x64.Build.0 = Release|x64
+		{07264DB3-819A-49AD-A242-7107922AC612}.Release|x86.ActiveCfg = Release|Win32
+		{07264DB3-819A-49AD-A242-7107922AC612}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
