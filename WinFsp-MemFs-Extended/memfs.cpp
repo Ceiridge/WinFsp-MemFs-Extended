@@ -494,7 +494,8 @@ typedef struct _MEMFS
     // memefs: Counter to track allocated memory
     volatile UINT64 AllocatedSectors;
     volatile UINT64 AllocatedSizesToBeDeleted;
-    std::map<MEMFS_FILE_NODE*, UINT64>* ToBeDeletedFileNodeSizes;
+    std::unordered_map<MEMFS_FILE_NODE*, UINT64>* ToBeDeletedFileNodeSizes;
+    std::mutex* ToBeDeletedFileNodeSizesMutex;
     // memefs: MaxFsSize instead of max. file nodes and individual limits
     UINT64 MaxFsSize;
     UINT64 CachedMaxFsSize;
@@ -516,7 +517,7 @@ static MEMFS* GlobalMemfs = 0;
 // memefs: Get the all file sizes and the node map size
 static inline
 UINT64 MemefsGetUsedTotalSize(MEMFS* Memfs) {
-    const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE) + sizeof(std::mutex));
+    const ULONG nodeMapSize = (ULONG)Memfs->FileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE) + sizeof(std::mutex) + sizeof(std::mutex*));
     // EA node map is ignored, because it is insignificant
 
     const SIZE_T sectorSizes = Memfs->AllocatedSectors * (sizeof(MEMEFS_SECTOR) + sizeof(MEMEFS_SECTOR*));
@@ -583,7 +584,7 @@ BOOL MemefsIsFullyEmpty(MEMFS* Memfs)
     }
     */
 
-	return InterlockedExchangeAdd(&Memfs->AllocatedSectors, 0ULL) == 0;
+    return InterlockedExchangeAdd(&Memfs->AllocatedSectors, 0ULL) == 0;
 }
 
 static inline
@@ -641,13 +642,15 @@ VOID MemfsFileNodeDelete(MEMFS_FILE_NODE* FileNode)
 #endif
 
     // memefs: SectorFree
-    SectorFree(&FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, &GlobalMemfs->AllocatedSectors);
-
     const auto mapIterator = GlobalMemfs->ToBeDeletedFileNodeSizes->find(FileNode);
     if (mapIterator != GlobalMemfs->ToBeDeletedFileNodeSizes->end()) {
-        GlobalMemfs->AllocatedSizesToBeDeleted -= mapIterator->second;
-        GlobalMemfs->ToBeDeletedFileNodeSizes->erase(mapIterator->first);
+        InterlockedExchangeSubtract(&GlobalMemfs->AllocatedSizesToBeDeleted, mapIterator->second);
+
+        std::unique_lock writeLock(*GlobalMemfs->ToBeDeletedFileNodeSizesMutex);
+    	GlobalMemfs->ToBeDeletedFileNodeSizes->erase(mapIterator->first); // TODO: Thread safe map
     }
+
+    SectorFree(&FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, &GlobalMemfs->AllocatedSectors);
 
     FileNode->FileDataSectors.~vector();
     delete FileNode->FileDataSectorsMutex;
@@ -966,7 +969,10 @@ VOID MemfsFileNodeMapRemove(MEMFS_FILE_NODE_MAP* FileNodeMap, MEMFS_FILE_NODE* F
         if (ReportDeletedSize)
         {
             const UINT64 toBeDeletedSizes = FileNode->FileDataSectors.size() * (sizeof(MEMEFS_SECTOR) + sizeof(MEMEFS_SECTOR*));
-            GlobalMemfs->AllocatedSizesToBeDeleted += toBeDeletedSizes;
+
+            InterlockedExchangeAdd(&GlobalMemfs->AllocatedSizesToBeDeleted, toBeDeletedSizes);
+
+            std::unique_lock writeLock(*GlobalMemfs->ToBeDeletedFileNodeSizesMutex);
             GlobalMemfs->ToBeDeletedFileNodeSizes->insert_or_assign(FileNode, toBeDeletedSizes);
         }
 
@@ -1267,12 +1273,11 @@ static NTSTATUS GetVolumeInfo(FSP_FILE_SYSTEM* FileSystem,
 {
     MEMFS* Memfs = (MEMFS*)FileSystem->UserContext;
 
-    const UINT64 toBeDeletedSize = Memfs->AllocatedSizesToBeDeleted;
+    const UINT64 toBeDeletedSize = InterlockedExchangeAdd(&Memfs->AllocatedSizesToBeDeleted, 0ULL);
     const UINT64 maxSize = MemefsGetMaxTotalSize(Memfs);
-    const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs) - toBeDeletedSize;
     const UINT64 availableSize = MemefsGetAvailableTotalSize(Memfs) + toBeDeletedSize;
 
-    VolumeInfo->TotalSize = max(maxSize, usedSize);
+    VolumeInfo->TotalSize = maxSize;
     VolumeInfo->FreeSize = availableSize;
     VolumeInfo->VolumeLabelLength = Memfs->VolumeLabelLength;
     memcpy(VolumeInfo->VolumeLabel, Memfs->VolumeLabel, Memfs->VolumeLabelLength);
@@ -2670,7 +2675,8 @@ NTSTATUS MemfsCreateFunnel(
     }
 
     // memefs: New ToBeDeletedFileNodeSizes
-    Memfs->ToBeDeletedFileNodeSizes = new std::map<MEMFS_FILE_NODE*, UINT64>();
+    Memfs->ToBeDeletedFileNodeSizes = new std::unordered_map<MEMFS_FILE_NODE*, UINT64>();
+    Memfs->ToBeDeletedFileNodeSizesMutex = new std::mutex();
 
     memset(&VolumeParams, 0, sizeof VolumeParams);
     VolumeParams.Version = sizeof FSP_FSCTL_VOLUME_PARAMS;
@@ -2717,6 +2723,7 @@ NTSTATUS MemfsCreateFunnel(
     {
         MemfsFileNodeMapDelete(Memfs->FileNodeMap);
         delete Memfs->ToBeDeletedFileNodeSizes;
+        delete Memfs->ToBeDeletedFileNodeSizesMutex;
         free(Memfs);
         LocalFree(RootSecurity);
         return Result;
@@ -2786,6 +2793,7 @@ VOID MemfsDelete(MEMFS* Memfs)
 
     MemfsFileNodeMapDelete(Memfs->FileNodeMap);
     delete Memfs->ToBeDeletedFileNodeSizes;
+    delete Memfs->ToBeDeletedFileNodeSizesMutex;
 
     free(Memfs);
 }
