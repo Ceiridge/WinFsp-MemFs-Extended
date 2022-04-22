@@ -242,8 +242,9 @@ BOOL SectorReAllocate(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVect
     return TRUE;
 }
 
+template <BOOL IsReading>
 static inline
-BOOL SectorRead(PVOID Buffer, MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMutex, SIZE_T Offset, SIZE_T Size)
+BOOL SectorReadWrite(PVOID Buffer, MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMutex, SIZE_T Offset, SIZE_T Size)
 {
     if (Size == 0) 
     {
@@ -269,56 +270,30 @@ BOOL SectorRead(PVOID Buffer, MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* Se
         return FALSE;
     }
 
-    SIZE_T readBytes = min(Size, MEMEFS_SECTOR_SIZE - offsetOffset);
-    memcpy(Buffer, (*SectorVector)[offsetSectorBegin]->Bytes + offsetOffset, readBytes);
+    SIZE_T byteAmount = min(Size, MEMEFS_SECTOR_SIZE - offsetOffset);
+    if (IsReading)
+    {
+        memcpy(Buffer, (*SectorVector)[offsetSectorBegin]->Bytes + offsetOffset, byteAmount);
+    }
+    else
+    {
+        memcpy((*SectorVector)[offsetSectorBegin]->Bytes + offsetOffset, Buffer, byteAmount);
+    }
 
     for (UINT64 i = offsetSectorBegin + 1; i <= sectorEnd; i++) 
     {
-        const SIZE_T readNow = min(MEMEFS_SECTOR_SIZE, Size - readBytes);
+        const SIZE_T copyNow = min(MEMEFS_SECTOR_SIZE, Size - byteAmount);
 
-        memcpy((PVOID)((ULONG_PTR)Buffer + readBytes), (*SectorVector)[i]->Bytes, readNow);
-        readBytes += readNow;
-    }
+        if (IsReading)
+        {
+            memcpy((PVOID)((ULONG_PTR)Buffer + byteAmount), (*SectorVector)[i]->Bytes, copyNow);
+        }
+        else
+        {
+            memcpy((*SectorVector)[i]->Bytes, (PVOID)((ULONG_PTR)Buffer + byteAmount), copyNow);
+        }
 
-    return TRUE;
-}
-
-static inline
-BOOL SectorWrite(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMutex, PVOID Buffer, SIZE_T Offset, SIZE_T Size)
-{
-    if (Size == 0)
-    {
-        return TRUE;
-    }
-
-#ifdef MEMEFS_HEAP_LOCKS
-    MEMEFS_USAGE_LOCK usageLock(MEMEFS_SECTOR_HEAP_LOCK);
-#endif
-
-    SectorVectorMutex->lock();
-    const SIZE_T sectorCount = SectorVector->size();
-    SectorVectorMutex->unlock();
-
-    const SIZE_T downAlignedOffset = SectorAlignSize(Offset, FALSE);
-    const UINT64 offsetSectorBegin = SectorGetSectorCount(downAlignedOffset);
-    const SIZE_T offsetOffset = Offset - downAlignedOffset;
-
-    const UINT64 sectorEnd = offsetSectorBegin + SectorGetSectorCount(SectorAlignSize(Size)) - 1;
-
-    if (offsetSectorBegin >= sectorCount || sectorEnd >= sectorCount || offsetOffset > MEMEFS_SECTOR_SIZE)
-    {
-        return FALSE;
-    }
-
-    SIZE_T writtenBytes = min(Size, MEMEFS_SECTOR_SIZE - offsetOffset);
-    memcpy((*SectorVector)[offsetSectorBegin]->Bytes + offsetOffset, Buffer, writtenBytes);
-
-    for (UINT64 i = offsetSectorBegin + 1; i <= sectorEnd; i++)
-    {
-        const SIZE_T writeNow = min(MEMEFS_SECTOR_SIZE, Size - writtenBytes);
-
-        memcpy((*SectorVector)[i]->Bytes, (PVOID)((ULONG_PTR)Buffer + writtenBytes), writeNow);
-        writtenBytes += writeNow;
+        byteAmount += copyNow;
     }
 
     return TRUE;
@@ -329,6 +304,7 @@ BOOL SectorFree(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMute
 {
     return SectorReAllocate(SectorVector, SectorVectorMutex, AllocatedSectorsCounter, 0);
 }
+
 
 /*
  * MEMFS
@@ -869,12 +845,6 @@ VOID MemfsFileNodeMapDelete(MEMFS_FILE_NODE_MAP* FileNodeMap)
 }
 
 static inline
-SIZE_T MemfsFileNodeMapCount(MEMFS_FILE_NODE_MAP* FileNodeMap)
-{
-    return FileNodeMap->size();
-}
-
-static inline
 MEMFS_FILE_NODE* MemfsFileNodeMapGet(MEMFS_FILE_NODE_MAP* FileNodeMap, PWSTR FileName)
 {
     MEMFS_FILE_NODE_MAP::iterator iter = FileNodeMap->find(FileName);
@@ -1188,7 +1158,7 @@ void SlowioReadThread(
     SlowioSnooze(FileSystem);
 
     // memefs: Sector Read
-    BOOL readSuccess = SectorRead(Buffer, &FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, Offset, EndOffset - Offset);
+    BOOL readSuccess = SectorReadWrite<TRUE>(Buffer, &FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, Offset, EndOffset - Offset);
     // memcpy(Buffer, (PUINT8)FileNode->FileData + Offset, (size_t)(EndOffset - Offset));
     UINT32 BytesTransferred = readSuccess ? (ULONG)(EndOffset - Offset) : 0;
 
@@ -1216,8 +1186,7 @@ void SlowioWriteThread(
     SlowioSnooze(FileSystem);
 
     // memefs: Sector Write
-    BOOL writeSuccess = SectorWrite(&FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, Buffer, Offset, EndOffset - Offset);
-    // memcpy((PUINT8)FileNode->FileData + Offset, Buffer, (size_t)(EndOffset - Offset));
+    BOOL writeSuccess = SectorReadWrite<FALSE>(Buffer, &FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, Offset, EndOffset - Offset);
     UINT32 BytesTransferred = writeSuccess ? (ULONG)(EndOffset - Offset) : 0;
 
     FSP_FSCTL_TRANSACT_RSP ResponseBuf;
@@ -1733,7 +1702,7 @@ static NTSTATUS Read(FSP_FILE_SYSTEM* FileSystem,
 #endif
 
     // memefs: Read from sector
-    if (!SectorRead(Buffer, &FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, Offset, EndOffset - Offset))
+    if (!SectorReadWrite<TRUE>(Buffer, &FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, Offset, EndOffset - Offset))
     {
         return STATUS_UNSUCCESSFUL;
     }
@@ -1812,7 +1781,7 @@ static NTSTATUS Write(FSP_FILE_SYSTEM* FileSystem,
 #endif
 
     // memefs: Write to sector
-    if (!SectorWrite(&FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, Buffer, Offset, EndOffset - Offset))
+    if (!SectorReadWrite<FALSE>(Buffer, &FileNode->FileDataSectors, FileNode->FileDataSectorsMutex, Offset, EndOffset - Offset))
     {
         return STATUS_UNSUCCESSFUL;
     }
