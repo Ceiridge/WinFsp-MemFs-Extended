@@ -24,7 +24,6 @@ options:
     -D DebugLogFile     [file path; use - for stderr]
     -i                  [case insensitive file system]
     -f                  [flush and purge cache on cleanup]
-    -t FileInfoTimeout  [millis]
     -s MaxFsSize        [bytes of maximum total memory size]
     -M MaxDelay         [maximum slow IO delay in millis]
     -P PercentDelay     [percent of slow IO to make pending]

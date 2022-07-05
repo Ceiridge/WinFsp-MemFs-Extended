@@ -263,7 +263,11 @@ BOOL SectorReadWrite(PVOID Buffer, MEMEFS_SECTOR_VECTOR* SectorVector, std::mute
     const UINT64 offsetSectorBegin = SectorGetSectorCount(downAlignedOffset);
     const SIZE_T offsetOffset = Offset - downAlignedOffset;
 
-    const UINT64 sectorEnd = offsetSectorBegin + SectorGetSectorCount(SectorAlignSize(Size)) - 1;
+    UINT64 sectorEnd = offsetSectorBegin + SectorGetSectorCount(SectorAlignSize(Size)) - 1;
+    if (offsetOffset > 0)
+    {
+        sectorEnd++; // Needs to read one more sector to account for the bytes from the first sector to receive the full length
+    }
 
     if (offsetSectorBegin >= sectorCount || sectorEnd >= sectorCount || offsetOffset > MEMEFS_SECTOR_SIZE)
     {

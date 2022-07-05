@@ -48,7 +48,7 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
     PWSTR DebugLogFile = 0;
     ULONG Flags = MemfsDisk;
     ULONG OtherFlags = 0;
-    ULONG FileInfoTimeout = INFINITE;
+    ULONG FileInfoTimeout = 0; //INFINITE;
     UINT64 MaxFsSize = 0;
     ULONG SlowioMaxDelay = 0;       /* -M: maximum slow IO delay in millis */
     ULONG SlowioPercentDelay = 0;   /* -P: percent of slow IO to make pending */
@@ -105,7 +105,8 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
             argtoll(MaxFsSize);
             break;
         case L't':
-            argtol(FileInfoTimeout);
+            // memefs
+            // argtol(FileInfoTimeout);
             break;
         case L'u':
             argtos(VolumePrefix);
@@ -217,7 +218,7 @@ usage:
 	        L"    -D DebugLogFile     [file path; use - for stderr]\n"
 	        L"    -i                  [case insensitive file system]\n"
 	        L"    -f                  [flush and purge cache on cleanup]\n"
-	        L"    -t FileInfoTimeout  [millis]\n"
+	        // L"    -t FileInfoTimeout  [millis]\n" // memefs: FileInfoTimeout disabled due to rename bugs
 	        L"    -s MaxFsSize        [bytes of maximum total memory size]\n"
 	        L"    -M MaxDelay         [maximum slow IO delay in millis]\n"
 	        L"    -P PercentDelay     [percent of slow IO to make pending]\n"
