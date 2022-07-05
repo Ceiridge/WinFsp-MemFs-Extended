@@ -269,7 +269,7 @@ BOOL SectorReadWrite(PVOID Buffer, MEMEFS_SECTOR_VECTOR* SectorVector, std::mute
         sectorEnd++; // Needs to read one more sector to account for the bytes from the first sector to receive the full length
     }
 
-    if (offsetSectorBegin >= sectorCount || sectorEnd >= sectorCount || offsetOffset > MEMEFS_SECTOR_SIZE)
+    if (offsetSectorBegin >= sectorCount || sectorEnd > sectorCount || offsetOffset > MEMEFS_SECTOR_SIZE)
     {
         return FALSE;
     }

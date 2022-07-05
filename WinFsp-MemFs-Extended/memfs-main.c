@@ -48,7 +48,7 @@ NTSTATUS SvcStart(FSP_SERVICE* Service, ULONG argc, PWSTR* argv)
     PWSTR DebugLogFile = 0;
     ULONG Flags = MemfsDisk;
     ULONG OtherFlags = 0;
-    ULONG FileInfoTimeout = 0; //INFINITE;
+    ULONG FileInfoTimeout = 0; //memefs: Used to be INFINITE;
     UINT64 MaxFsSize = 0;
     ULONG SlowioMaxDelay = 0;       /* -M: maximum slow IO delay in millis */
     ULONG SlowioPercentDelay = 0;   /* -P: percent of slow IO to make pending */
