@@ -54,7 +54,7 @@ options:
 	1. Add a new action with the following settings:
 	```
 	Program/Script: "C:\Program Files (x86)\WinFsp\bin\launchctl-x64.exe"
-	Arguments: start memefs64 ramdisk "" R:
+	Arguments: start memefs64 ramdisk "" \\.\R:
 	```
 	1. Optionally disable *Only run if the computer is connected to a power supply* in the task settings
 	1. Save, run and test
