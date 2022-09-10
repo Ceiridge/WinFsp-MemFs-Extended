@@ -58,3 +58,6 @@ options:
 	```
 	1. Optionally disable *Only run if the computer is connected to a power supply* in the task settings
 	1. Save, run and test
+
+## Known Problems
+- Concurrent actions on the same files leads to strange behavior (=> Avoid concurrency on the ramdisk)
