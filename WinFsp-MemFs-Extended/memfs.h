@@ -14,8 +14,7 @@
   * associated repository.
   */
 
-#ifndef MEMFS_H_INCLUDED
-#define MEMFS_H_INCLUDED
+#pragma once
 
 #include <winfsp/winfsp.h>
 
@@ -67,6 +66,4 @@ extern "C" {
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

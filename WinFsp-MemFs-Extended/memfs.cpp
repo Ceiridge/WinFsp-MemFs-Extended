@@ -14,7 +14,7 @@
   * associated repository.
   */
 
-#undef _DEBUG
+// #undef _DEBUG
 #include "memfs.h"
 #include <sddl.h>
 #include <VersionHelpers.h>

@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="memfs-main.c" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="memfs.cpp" />
   </ItemGroup>
   <ItemGroup>
