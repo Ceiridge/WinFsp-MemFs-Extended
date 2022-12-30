@@ -1,4 +1,4 @@
- /*
+/*
   * This file is part of WinFsp.
   *
   * You can redistribute it and/or modify it under the terms of the GNU
@@ -17,53 +17,51 @@
 #pragma once
 
 #include <winfsp/winfsp.h>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace Memfs {
+	static constexpr int MEMFS_MAX_PATH = 512;
+	static constexpr UINT64 MEMFS_SECTOR_SIZE = 512;
+	static constexpr UINT64 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
-    typedef struct _MEMFS MEMFS;
+	enum {
+		MemfsDisk = 0x00000000,
+		MemfsNet = 0x00000001,
+		MemfsDeviceMask = 0x0000000f,
+		MemfsCaseInsensitive = 0x80000000,
+		MemfsFlushAndPurgeOnCleanup = 0x40000000,
+		MemfsLegacyUnlinkRename = 0x20000000,
+	};
 
-    enum
-    {
-        MemfsDisk = 0x00000000,
-        MemfsNet = 0x00000001,
-        MemfsDeviceMask = 0x0000000f,
-        MemfsCaseInsensitive = 0x80000000,
-        MemfsFlushAndPurgeOnCleanup = 0x40000000,
-        MemfsLegacyUnlinkRename = 0x20000000,
-    };
+	class MemFs {
+	public:
+		MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const wchar_t* volumePrefix, const wchar_t* volumeLabel, const wchar_t* rootSddl);
+		~MemFs();
 
-#define MemfsCreate(Flags, FileInfoTimeout, MaxFileNodes, MaxFileSize, VolumePrefix, RootSddl, PMemfs)\
-    MemfsCreateFunnel(\
-        Flags,\
-        FileInfoTimeout,\
-        MaxFileNodes,\
-        MaxFileSize,\
-        0/*SlowioMaxDelay*/,\
-        0/*SlowioPercentDelay*/,\
-        0/*SlowioRarefyDelay*/,\
-        0/*FileSystemName*/,\
-        VolumePrefix,\
-        RootSddl,\
-        PMemfs)
-    NTSTATUS MemfsCreateFunnel(
-        ULONG Flags,
-        ULONG FileInfoTimeout,
-        UINT64 MaxFsSize,
-        ULONG SlowioMaxDelay,
-        ULONG SlowioPercentDelay,
-        ULONG SlowioRarefyDelay,
-        PWSTR FileSystemName,
-        PWSTR VolumePrefix,
-        PWSTR VolumeLabel,
-        PWSTR RootSddl,
-        MEMFS** PMemfs);
-    VOID MemfsDelete(MEMFS* Memfs);
-    NTSTATUS MemfsStart(MEMFS* Memfs);
-    VOID MemfsStop(MEMFS* Memfs);
-    FSP_FILE_SYSTEM* MemfsFileSystem(MEMFS* Memfs);
+		void Destroy();
 
-#ifdef __cplusplus
+		[[nodiscard]] NTSTATUS Start() const;
+		void Stop() const;
+
+		FSP_FILE_SYSTEM* GetRawFileSystem() const;
+
+		// TODO: Create funnel, test constructors and operators, rest of functions, separate
+
+		explicit MemFs(const MemFs& other) = delete;
+		MemFs(MemFs&& other) noexcept = delete;
+
+		MemFs& operator=(const MemFs& other) = delete;
+		MemFs& operator=(MemFs&& other) noexcept = delete;
+
+	private:
+		std::unique_ptr<FSP_FILE_SYSTEM> fileSystem{};
+
+		UINT64 maxFsSize;
+		std::wstring volumeLabel{L"MEMEFS"};
+
+		std::unordered_map<MEMFS_FILE_NODE*, UINT64> toBeDeletedFileNodeSizes;
+		std::mutex toBeDeletedFileNodeMutex;
+	};
 }
-#endif

@@ -2759,38 +2759,3 @@ NTSTATUS MemfsCreateFunnel(
 
     return STATUS_SUCCESS;
 }
-
-VOID MemfsDelete(MEMFS* Memfs)
-{
-    FspFileSystemDelete(Memfs->FileSystem);
-
-    MemfsFileNodeMapDelete(Memfs->FileNodeMap);
-    delete Memfs->ToBeDeletedFileNodeSizes;
-    delete Memfs->ToBeDeletedFileNodeSizesMutex;
-
-    free(Memfs);
-}
-
-NTSTATUS MemfsStart(MEMFS* Memfs)
-{
-#ifdef MEMFS_SLOWIO
-    Memfs->SlowioThreadsRunning = 0;
-#endif
-
-    return FspFileSystemStartDispatcher(Memfs->FileSystem, 0);
-}
-
-VOID MemfsStop(MEMFS* Memfs)
-{
-    FspFileSystemStopDispatcher(Memfs->FileSystem);
-
-#ifdef MEMFS_SLOWIO
-    while (Memfs->SlowioThreadsRunning)
-        Sleep(1);
-#endif
-}
-
-FSP_FILE_SYSTEM* MemfsFileSystem(MEMFS* Memfs)
-{
-    return Memfs->FileSystem;
-}

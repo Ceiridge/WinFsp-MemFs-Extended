@@ -17,7 +17,9 @@
 #include <string>
 #include <winfsp/winfsp.h>
 
+#include "exceptions.h"
 #include "memfs.h"
+using namespace Memfs;
 
 static const std::wstring PROGNAME{L"memefs"};
 
@@ -61,8 +63,7 @@ NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 
 	HANDLE debugLogHandle{INVALID_HANDLE_VALUE};
 
-	MEMFS* memfs{};
-	NTSTATUS result;
+	NTSTATUS result{-1};
 
 	for (argp = argv + 1, arge = argv + argc; arge > argp; argp++) {
 		if (L'-' != argp[0][0])
@@ -134,27 +135,20 @@ NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 		FspDebugLogSetHandle(debugLogHandle);
 	}
 
-	result = MemfsCreateFunnel(
-		flags | otherFlags,
-		fileInfoTimeout,
-		maxFsSize,
-		0,
-		0,
-		0,
-		fileSystemName,
-		volumePrefix,
-		volumeLabel,
-		rootSddl,
-		&memfs);
-	if (!NT_SUCCESS(result)) {
+	std::unique_ptr<MemFs> memfs; // TODO: The lifetime might has to be extended here
+
+	try {
+		memfs = std::make_unique<MemFs>(MemFs(flags | otherFlags, maxFsSize, fileSystemName, volumePrefix, volumeLabel, rootSddl));
+	} catch (CreateException& _) {
 		LogFail(L"cannot create MEMFS");
 		goto exit;
 	}
 
-	FspFileSystemSetDebugLog(MemfsFileSystem(memfs), debugFlags);
+	FSP_FILE_SYSTEM* rawFileSystem = memfs->GetRawFileSystem();
+	FspFileSystemSetDebugLog(rawFileSystem, debugFlags);
 
-	if (0 != mountPoint && L'\0' != mountPoint[0]) {
-		result = FspFileSystemSetMountPoint(MemfsFileSystem(memfs),
+	if (nullptr != mountPoint && L'\0' != mountPoint[0]) {
+		result = FspFileSystemSetMountPoint(rawFileSystem,
 		                                    L'*' == mountPoint[0] && L'\0' == mountPoint[1] ? nullptr : mountPoint);
 		if (!NT_SUCCESS(result)) {
 			LogFail(L"cannot mount MEMFS");
@@ -162,29 +156,30 @@ NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 		}
 	}
 
-	result = MemfsStart(memfs);
+	result = memfs->Start();
 	if (!NT_SUCCESS(result)) {
 		LogFail(L"cannot start MEMFS");
 		goto exit;
 	}
 
-	mountPoint = FspFileSystemMountPoint(MemfsFileSystem(memfs));
+	mountPoint = FspFileSystemMountPoint(rawFileSystem);
 
 	LogInfo(L"%s -s %lu%s%s%s%s%s%s%s%s",
-	          PROGNAME.c_str(), maxFsSize,
-	          rootSddl ? L" -S " : L"", rootSddl ? rootSddl : L"",
-	          nullptr != volumePrefix && L'\0' != volumePrefix[0] ? L" -u " : L"",
-	          nullptr != volumePrefix && L'\0' != volumePrefix[0] ? volumePrefix : L"",
-	          mountPoint ? L" -m " : L"", mountPoint ? mountPoint : L"",
-	          nullptr != volumeLabel && L'\0' != volumeLabel[0] ? L" -l " : L"",
-	          nullptr != volumeLabel && L'\0' != volumeLabel[0] ? volumeLabel : L"");
+	        PROGNAME.c_str(), maxFsSize,
+	        rootSddl ? L" -S " : L"", rootSddl ? rootSddl : L"",
+	        nullptr != volumePrefix && L'\0' != volumePrefix[0] ? L" -u " : L"",
+	        nullptr != volumePrefix && L'\0' != volumePrefix[0] ? volumePrefix : L"",
+	        mountPoint ? L" -m " : L"", mountPoint ? mountPoint : L"",
+	        nullptr != volumeLabel && L'\0' != volumeLabel[0] ? L" -l " : L"",
+	        nullptr != volumeLabel && L'\0' != volumeLabel[0] ? volumeLabel : L"");
 
-	service->UserContext = memfs;
+	service->UserContext = memfs.get();
 	result = STATUS_SUCCESS;
 
 exit:
-	if (!NT_SUCCESS(result) && memfs != nullptr)
-		MemfsDelete(memfs);
+	if (!NT_SUCCESS(result) && memfs != nullptr) {
+		memfs->Destroy();
+	}
 
 	return result;
 
@@ -212,10 +207,10 @@ usage: {
 }
 
 NTSTATUS SvcStop(FSP_SERVICE* service) {
-	MEMFS* memfs = static_cast<MEMFS*>(service->UserContext);
+	MemFs* memfs = static_cast<MemFs*>(service->UserContext);
 
-	MemfsStop(memfs);
-	MemfsDelete(memfs);
+	memfs->Stop();
+	memfs->Destroy();
 
 	return STATUS_SUCCESS;
 }
