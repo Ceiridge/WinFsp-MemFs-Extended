@@ -13,4 +13,8 @@ namespace Memfs {
 	private:
 		NTSTATUS status;
 	};
+
+	class FileNameTooLongException final : public std::exception {
+		[[nodiscard]] char const* what() const override;
+	};
 }

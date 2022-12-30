@@ -9,6 +9,10 @@
 using namespace Memfs;
 
 MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const wchar_t* volumePrefix, const wchar_t* volumeLabel, const wchar_t* rootSddl) : maxFsSize(maxFsSize) {
+	if (MEMFS_SINGLETON != nullptr) {
+		throw std::runtime_error("There can only be one memfs.");
+	}
+
 	const bool caseInsensitive = !!(flags & MemfsCaseInsensitive);
 	const bool flushAndPurgeOnCleanup = !!(flags & MemfsFlushAndPurgeOnCleanup);
 	const bool supportsPosixUnlinkRename = !(flags & MemfsLegacyUnlinkRename);
@@ -110,6 +114,7 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	}
 
 	LocalFree(rootSecurity);
+	MEMFS_SINGLETON = this;
 }
 
 MemFs::~MemFs() {

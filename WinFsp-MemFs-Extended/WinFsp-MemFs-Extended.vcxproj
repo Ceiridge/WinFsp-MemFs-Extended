@@ -23,8 +23,10 @@
     <ClCompile Include="comparisons.cpp" />
     <ClCompile Include="create.cpp" />
     <ClCompile Include="exceptions.cpp" />
+    <ClCompile Include="filemap.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="memfs.cpp" />
+    <ClCompile Include="nodes.cpp" />
     <ClCompile Include="other.cpp" />
     <ClCompile Include="sectors.cpp" />
     <ClCompile Include="security.cpp" />
@@ -36,6 +38,7 @@
     <ClInclude Include="comparisons.h" />
     <ClInclude Include="exceptions.h" />
     <ClInclude Include="memfs-interface.h" />
+    <ClInclude Include="nodes.h" />
     <ClInclude Include="sectors.h" />
     <ClInclude Include="memfs.h" />
     <ClInclude Include="utils.h" />

@@ -57,6 +57,12 @@
     <ClCompile Include="comparisons.cpp">
       <Filter>Quelldateien\utils</Filter>
     </ClCompile>
+    <ClCompile Include="nodes.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="filemap.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="memfs.h">
@@ -76,6 +82,9 @@
     </ClInclude>
     <ClInclude Include="comparisons.h">
       <Filter>Quelldateien\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="nodes.h">
+      <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

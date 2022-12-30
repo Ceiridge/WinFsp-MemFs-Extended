@@ -19,3 +19,11 @@ void MemFs::SetVolumeLabel(const std::wstring& str) {
 
 	this->volumeLabel = label;
 }
+
+SectorManager& MemFs::GetSectorManager() {
+	return this->sectors;
+}
+
+void MemFs::RecreateSectorManager() {
+	this->sectors = SectorManager();
+}

@@ -16,14 +16,14 @@
 
 #pragma once
 
+#include <map>
 #include <winfsp/winfsp.h>
-#include <mutex>
-#include <unordered_map>
 
+#include "nodes.h"
 #include "sectors.h"
 
 namespace Memfs {
-	static constexpr int MEMFS_MAX_PATH = 512;
+	static constexpr int MEMFS_MAX_PATH = 32766;
 	static constexpr UINT64 MEMFS_SECTOR_SIZE = 512;
 	static constexpr UINT64 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
 
@@ -35,6 +35,8 @@ namespace Memfs {
 		MemfsFlushAndPurgeOnCleanup = 0x40000000,
 		MemfsLegacyUnlinkRename = 0x20000000,
 	};
+
+	using FileNodeMap = std::map<std::wstring, FileNode, Utils::FileLess>;
 
 	class MemFs {
 	public:
@@ -60,9 +62,11 @@ namespace Memfs {
 		std::wstring& GetVolumeLabel();
 		void SetVolumeLabel(const std::wstring& str);
 
+		SectorManager& GetSectorManager();
+		void RecreateSectorManager();
+
 	private:
 		FSP_FILE_SYSTEM* fileSystem{};
-		SectorManager sectors;
 
 		UINT64 maxFsSize;
 		UINT64 cachedMaxFsSize;
@@ -70,7 +74,20 @@ namespace Memfs {
 
 		std::wstring volumeLabel{L"MEMEFS"};
 
-		std::unordered_map<MEMFS_FILE_NODE*, UINT64> toBeDeletedFileNodeSizes;
-		std::mutex toBeDeletedFileNodeMutex;
+		SectorManager sectors;
+		FileNodeMap fileMap;
+
+		// std::unordered_map<MEMFS_FILE_NODE*, UINT64> toBeDeletedFileNodeSizes;
+		// std::mutex toBeDeletedFileNodeMutex;
+
+		[[nodiscard]] bool IsCaseInsensitive() const;
+		std::optional<FileNode&> FindMainFromStream(const std::wstring_view fileName);
+		std::pair<NTSTATUS, std::optional<FileNode&>> FindParent(const std::wstring_view fileName);
+		void TouchParent(const FileNode& node);
+
+		NTSTATUS InsertNode(FileNode& node);
+		void RemoveNode(FileNode& node, const bool reportDeletedSize = true);
 	};
+
+	static inline MemFs* MEMFS_SINGLETON;
 }

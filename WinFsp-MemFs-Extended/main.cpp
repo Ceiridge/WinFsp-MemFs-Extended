@@ -43,6 +43,9 @@ static UINT64 wcstoll_deflt(wchar_t* w, UINT64 deflt) {
 	return L'\0' != w[0] && L'\0' == *endp ? ull : deflt;
 }
 
+// There can only be one memfs
+static std::unique_ptr<MemFs> GlobalMemFs;
+
 NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 	wchar_t **argp, **arge;
 
@@ -135,14 +138,14 @@ NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 		FspDebugLogSetHandle(debugLogHandle);
 	}
 
-	std::unique_ptr<MemFs> memfs; // TODO: The lifetime might has to be extended here
-
 	try {
-		memfs = std::make_unique<MemFs>(MemFs(flags | otherFlags, maxFsSize, fileSystemName, volumePrefix, volumeLabel, rootSddl));
+		GlobalMemFs = std::make_unique<MemFs>(MemFs(flags | otherFlags, maxFsSize, fileSystemName, volumePrefix, volumeLabel, rootSddl));
 	} catch (CreateException& _) {
 		LogFail(L"cannot create MEMFS");
 		goto exit;
 	}
+
+	MemFs* memfs = GlobalMemFs.get();
 
 	FSP_FILE_SYSTEM* rawFileSystem = memfs->GetRawFileSystem();
 	FspFileSystemSetDebugLog(rawFileSystem, debugFlags);
@@ -173,7 +176,7 @@ NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 	        nullptr != volumeLabel && L'\0' != volumeLabel[0] ? L" -l " : L"",
 	        nullptr != volumeLabel && L'\0' != volumeLabel[0] ? volumeLabel : L"");
 
-	service->UserContext = memfs.get();
+	service->UserContext = memfs;
 	result = STATUS_SUCCESS;
 
 exit:
@@ -212,6 +215,7 @@ NTSTATUS SvcStop(FSP_SERVICE* service) {
 	memfs->Stop();
 	memfs->Destroy();
 
+	GlobalMemFs.reset();
 	return STATUS_SUCCESS;
 }
 

@@ -19,6 +19,8 @@ SectorManager::SectorManager(SectorManager&& other) noexcept : heap(std::move(ot
 }
 
 SectorManager& SectorManager::operator=(SectorManager&& other) noexcept {
+	HeapDestroy(this->heap);
+
 	this->heap = other.heap;
 	other.heap = nullptr;
 	this->allocatedSectors = other.allocatedSectors;
@@ -106,6 +108,10 @@ bool SectorManager::Free(SectorNode& node) {
 	return ReAllocate(node, 0);
 }
 
+bool SectorManager::IsFullyEmpty() {
+	return InterlockedExchangeAdd(&this->allocatedSectors, 0ULL) == 0;
+}
+
 template <bool IsReading>
 bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size, const size_t offset) {
 	if (size == 0) {
@@ -149,4 +155,24 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 	}
 
 	return true;
+}
+
+SectorNode::~SectorNode() {
+	const SectorManager& sectorManager = MEMFS_SINGLETON->GetSectorManager();
+	sectorManager.Free(*this);
+
+	// memefs: If fully empty, recreate the heap
+	if(sectorManager.IsFullyEmpty()) {
+		MEMFS_SINGLETON->RecreateSectorManager();
+	}
+}
+
+SectorNode::SectorNode(SectorNode&& other) noexcept : Sectors(std::move(other.Sectors)) {
+}
+
+SectorNode& SectorNode::operator=(SectorNode&& other) noexcept {
+	MEMFS_SINGLETON->GetSectorManager().Free(*this);
+
+	this->Sectors = std::move(other.Sectors);
+	return *this;
 }

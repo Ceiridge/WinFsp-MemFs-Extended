@@ -19,6 +19,15 @@ namespace Memfs {
 	struct SectorNode {
 		SectorVector Sectors;
 		std::mutex SectorsMutex;
+
+		SectorNode() = default;
+		// This must free all sectors on destruction!
+		~SectorNode();
+
+		SectorNode(const SectorNode& other) = delete;
+		SectorNode(SectorNode&& other) noexcept;
+		SectorNode& operator=(const SectorNode& other) = delete;
+		SectorNode& operator=(SectorNode&& other) noexcept;
 	};
 
 	class SectorManager {
@@ -39,6 +48,8 @@ namespace Memfs {
 
 		bool ReAllocate(SectorNode& node, const size_t size);
 		bool Free(SectorNode& node);
+
+		bool IsFullyEmpty();
 	private:
 		HANDLE heap;
 		volatile UINT64 allocatedSectors{0};
