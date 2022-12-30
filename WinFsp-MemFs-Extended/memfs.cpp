@@ -304,64 +304,6 @@ static NTSTATUS SetFileSizeInternal(FSP_FILE_SYSTEM* FileSystem,
     PVOID FileNode0, UINT64 NewSize, BOOLEAN SetAllocationSize);
 
 
-static VOID Cleanup(FSP_FILE_SYSTEM* FileSystem,
-    PVOID FileNode0, PWSTR FileName, ULONG Flags)
-{
-    MEMFS* Memfs = (MEMFS*)FileSystem->UserContext;
-    MEMFS_FILE_NODE* FileNode = (MEMFS_FILE_NODE*)FileNode0;
-#if defined(MEMFS_NAMED_STREAMS)
-    MEMFS_FILE_NODE* MainFileNode = 0 != FileNode->MainFileNode ?
-        FileNode->MainFileNode : FileNode;
-#else
-    MEMFS_FILE_NODE* MainFileNode = FileNode;
-#endif
-
-    assert(0 != Flags); /* FSP_FSCTL_VOLUME_PARAMS::PostCleanupWhenModifiedOnly ensures this */
-
-    if (Flags & FspCleanupSetArchiveBit)
-    {
-        if (0 == (MainFileNode->FileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-            MainFileNode->FileInfo.FileAttributes |= FILE_ATTRIBUTE_ARCHIVE;
-    }
-
-    if (Flags & (FspCleanupSetLastAccessTime | FspCleanupSetLastWriteTime | FspCleanupSetChangeTime))
-    {
-        UINT64 SystemTime = MemfsGetSystemTime();
-
-        if (Flags & FspCleanupSetLastAccessTime)
-            MainFileNode->FileInfo.LastAccessTime = SystemTime;
-        if (Flags & FspCleanupSetLastWriteTime)
-            MainFileNode->FileInfo.LastWriteTime = SystemTime;
-        if (Flags & FspCleanupSetChangeTime)
-            MainFileNode->FileInfo.ChangeTime = SystemTime;
-    }
-
-    if (Flags & FspCleanupSetAllocationSize)
-    {
-        UINT64 AllocationUnit = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
-        UINT64 AllocationSize = (FileNode->FileInfo.FileSize + AllocationUnit - 1) /
-            AllocationUnit * AllocationUnit;
-
-        SetFileSizeInternal(FileSystem, FileNode, AllocationSize, TRUE);
-    }
-
-    if ((Flags & FspCleanupDelete) && !MemfsFileNodeMapHasChild(Memfs->FileNodeMap, FileNode))
-    {
-#if defined(MEMFS_NAMED_STREAMS)
-        MEMFS_FILE_NODE_MAP_ENUM_CONTEXT Context = { FALSE };
-        ULONG Index;
-
-        MemfsFileNodeMapEnumerateNamedStreams(Memfs->FileNodeMap, FileNode,
-            MemfsFileNodeMapEnumerateFn, &Context);
-        for (Index = 0; Context.Count > Index; Index++)
-            MemfsFileNodeMapRemove(Memfs->FileNodeMap, Context.FileNodes[Index]);
-        MemfsFileNodeMapEnumerateFree(&Context);
-#endif
-
-        MemfsFileNodeMapRemove(Memfs->FileNodeMap, FileNode);
-    }
-}
-
 static NTSTATUS Read(FSP_FILE_SYSTEM* FileSystem,
     PVOID FileNode0, PVOID Buffer, UINT64 Offset, ULONG Length,
     PULONG PBytesTransferred)

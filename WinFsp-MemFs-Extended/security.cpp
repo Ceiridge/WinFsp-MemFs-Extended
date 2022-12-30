@@ -5,40 +5,44 @@ namespace Memfs::Interface {
 		MemFs* memfs = GetMemFs(fileSystem);
 		NTSTATUS result;
 
-		MEMFS_FILE_NODE* fileNode = MemfsFileNodeMapGet(memfs->FileNodeMap, fileName);
-
-		if (fileNode == nullptr) {
+		const auto fileNodeOpt = memfs->FindFile(fileName);
+		if (!fileNodeOpt.has_value()) {
 			result = STATUS_OBJECT_NAME_NOT_FOUND;
 
-			if (FspFileSystemFindReparsePoint(fileSystem, GetReparsePointByName, nullptr,
+			if (FspFileSystemFindReparsePoint(fileSystem, CompatGetReparsePointByName, nullptr,
 			                                  fileName, pFileAttributes)) {
 				result = STATUS_REPARSE;
 			} else {
-				MemfsFileNodeMapGetParent(memfs->FileNodeMap, fileName, &result);
+				const auto [parentResult, _] = memfs->FindParent(fileName);
+				result = parentResult;
 			}
 
 			return result;
 		}
+		FileNode* fileNode = &fileNodeOpt.value();
+		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		UINT32 fileAttributesMask = ~(UINT32)0;
-		if (fileNode->MainFileNode != nullptr) {
+		if (!fileNode->IsMainNode()) {
 			fileAttributesMask = ~(UINT32)FILE_ATTRIBUTE_DIRECTORY;
-			fileNode = fileNode->MainFileNode;
+
+			mainFileNodeShared = fileNode->GetMainNode().lock();
+			fileNode = mainFileNodeShared.get();
 		}
 
 		if (pFileAttributes != nullptr) {
-			*pFileAttributes = fileNode->FileInfo.FileAttributes & fileAttributesMask;
+			*pFileAttributes = fileNode->fileInfo.FileAttributes & fileAttributesMask;
 		}
 
 		if (pSecurityDescriptorSize != nullptr) {
-			if (fileNode->FileSecuritySize > *pSecurityDescriptorSize) {
-				*pSecurityDescriptorSize = fileNode->FileSecuritySize;
+			if (fileNode->fileSecurity.ByteSize() > *pSecurityDescriptorSize) {
+				*pSecurityDescriptorSize = fileNode->fileSecurity.ByteSize();
 				return STATUS_BUFFER_OVERFLOW;
 			}
 
-			*pSecurityDescriptorSize = fileNode->FileSecuritySize;
+			*pSecurityDescriptorSize = fileNode->fileSecurity.ByteSize();
 			if (securityDescriptor != nullptr) {
-				memcpy_s(securityDescriptor, sizeof(SECURITY_DESCRIPTOR), fileNode->FileSecurity, fileNode->FileSecuritySize);
+				memcpy_s(securityDescriptor, sizeof(SECURITY_DESCRIPTOR), fileNode->fileSecurity.Struct(), sizeof(SECURITY_DESCRIPTOR));
 			}
 		}
 
@@ -48,20 +52,22 @@ namespace Memfs::Interface {
 	// This code is slightly duplicated :)
 	static NTSTATUS GetSecurity(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
 	                            PSECURITY_DESCRIPTOR securityDescriptor, SIZE_T* pSecurityDescriptorSize) {
-		MEMFS_FILE_NODE* fileNode = (MEMFS_FILE_NODE*)FileNode0;
+		FileNode* fileNode = GetFileNode(fileNode0);
+		std::shared_ptr<FileNode> mainFileNodeShared;
 
-		if (fileNode->MainFileNode != nullptr) {
-			fileNode = fileNode->MainFileNode;
+		if (!fileNode->IsMainNode()) {
+			mainFileNodeShared = fileNode->GetMainNode().lock();
+			fileNode = mainFileNodeShared.get();
 		}
 
-		if (fileNode->FileSecuritySize > *pSecurityDescriptorSize) {
-			*pSecurityDescriptorSize = fileNode->FileSecuritySize;
+		if (fileNode->fileSecurity.ByteSize() > *pSecurityDescriptorSize) {
+			*pSecurityDescriptorSize = fileNode->fileSecurity.ByteSize();
 			return STATUS_BUFFER_OVERFLOW;
 		}
 
-		*pSecurityDescriptorSize = fileNode->FileSecuritySize;
+		*pSecurityDescriptorSize = fileNode->fileSecurity.ByteSize();
 		if (securityDescriptor != nullptr) {
-			memcpy_s(securityDescriptor, sizeof(SECURITY_DESCRIPTOR), fileNode->FileSecurity, fileNode->FileSecuritySize);
+			memcpy_s(securityDescriptor, sizeof(SECURITY_DESCRIPTOR), fileNode->fileSecurity.Struct(), sizeof(SECURITY_DESCRIPTOR));
 		}
 
 		return STATUS_SUCCESS;
@@ -69,34 +75,35 @@ namespace Memfs::Interface {
 
 	static NTSTATUS SetSecurity(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
 	                            SECURITY_INFORMATION securityInformation, PSECURITY_DESCRIPTOR modificationDescriptor) {
-		MEMFS_FILE_NODE* fileNode = (MEMFS_FILE_NODE*)FileNode0;
+		FileNode* fileNode = GetFileNode(fileNode0);
+		std::shared_ptr<FileNode> mainFileNodeShared;
+
 		PSECURITY_DESCRIPTOR newSecurityDescriptor;
 
-		if (fileNode->MainFileNode != nullptr) {
-			fileNode = fileNode->MainFileNode;
+		if (!fileNode->IsMainNode()) {
+			mainFileNodeShared = fileNode->GetMainNode().lock();
+			fileNode = mainFileNodeShared.get();
 		}
 
 		NTSTATUS result = FspSetSecurityDescriptor(
-			fileNode->FileSecurity,
-			SecurityInformation,
-			ModificationDescriptor,
+			fileNode->fileSecurity.Struct(),
+			securityInformation,
+			modificationDescriptor,
 			&newSecurityDescriptor);
 		if (!NT_SUCCESS(result)) {
 			return result;
 		}
 
-		SIZE_T fileSecuritySize = GetSecurityDescriptorLength(newSecurityDescriptor);
-		PSECURITY_DESCRIPTOR fileSecurity = (PSECURITY_DESCRIPTOR)malloc(fileSecuritySize); // TODO: NO! NO NONO NONO
-		if (fileSecurity == nullptr) {
+		const SIZE_T fileSecuritySize = GetSecurityDescriptorLength(newSecurityDescriptor);
+		try {
+			fileNode->fileSecurity = DynamicStruct<SECURITY_DESCRIPTOR>(fileSecuritySize);
+
+			memcpy_s(fileNode->fileSecurity.Struct(), fileNode->fileSecurity.ByteSize(), newSecurityDescriptor, fileSecuritySize);
+			FspDeleteSecurityDescriptor(newSecurityDescriptor, (NTSTATUS(*)())FspSetSecurityDescriptor);
+		} catch (...) {
 			FspDeleteSecurityDescriptor(newSecurityDescriptor, (NTSTATUS(*)())FspSetSecurityDescriptor);
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
-		memcpy(fileSecurity, newSecurityDescriptor, fileSecuritySize); // TODO: NO!
-		FspDeleteSecurityDescriptor(newSecurityDescriptor, (NTSTATUS(*)())FspSetSecurityDescriptor);
-
-		free(fileNode->FileSecurity); // TODO: ALSO NO
-		fileNode->FileSecuritySize = fileSecuritySize;
-		fileNode->FileSecurity = fileSecurity;
 
 		return STATUS_SUCCESS;
 	}

@@ -1,3 +1,5 @@
+#include <cassert>
+
 #include "exceptions.h"
 #include "memfs-interface.h"
 #include "nodes.h"
@@ -55,6 +57,31 @@ namespace Memfs {
 				//        (size_t)(NewSize - fileNode->fileInfo.FileSize));
 				fileNode->fileInfo.FileSize = newSize;
 			}
+		}
+
+		return STATUS_SUCCESS;
+	}
+
+	static NTSTATUS CompatGetReparsePointByName(FSP_FILE_SYSTEM* fileSystem, PVOID context, PWSTR fileName, BOOLEAN isDirectory, PVOID buffer, PSIZE_T pSize) {
+		MemFs* memfs = Interface::GetMemFs(fileSystem);
+
+		/* GetReparsePointByName will never receive a named stream */
+		assert(nullptr == wcschr(fileName, L':'));
+
+		const auto fileNodeOpt = memfs->FindFile(fileName);
+		if (!fileNodeOpt.has_value())
+			return STATUS_OBJECT_NAME_NOT_FOUND;
+		FileNode& fileNode = fileNodeOpt.value();
+
+		if (0 == (fileNode.fileInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
+			return STATUS_NOT_A_REPARSE_POINT;
+
+		if (buffer != nullptr) {
+			if (fileNode.reparseData.WantedByteSize() > *pSize)
+				return STATUS_BUFFER_TOO_SMALL;
+
+			*pSize = fileNode.reparseData.WantedByteSize();
+			memcpy_s(buffer, *pSize, fileNode.reparseData.Struct(), fileNode.reparseData.WantedByteSize());
 		}
 
 		return STATUS_SUCCESS;

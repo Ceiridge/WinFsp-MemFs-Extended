@@ -17,6 +17,7 @@ public:
 		const bool fraction = size % sizeof(int64_t) != 0;
 		const std::size_t requiredInt64s = size / sizeof(int64_t) + (fraction ? 1 : 0); // + 1 if not divisible
 
+		wantedSize_ = size;
 		size_ = requiredInt64s * sizeof(int64_t);
 		data_ = std::make_unique<int64_t[]>(requiredInt64s);
 	}
@@ -24,6 +25,7 @@ public:
 	~DynamicStruct() = default;
 
 	DynamicStruct(const DynamicStruct& other) {
+		wantedSize_ = other.wantedSize_;
 		size_ = other.size_;
 		data_ = std::make_unique<int64_t[]>(size_);
 		std::memcpy(data_.get(), other.data_.get(), size_ * sizeof(int64_t));
@@ -33,6 +35,7 @@ public:
 
 	DynamicStruct& operator=(const DynamicStruct& other) {
 		if (this != &other) {
+			wantedSize_ = other.wantedSize_;
 			size_ = other.size_;
 			data_ = std::make_unique<int64_t[]>(size_);
 			std::memcpy(data_.get(), other.data_.get(), size_ * sizeof(int64_t));
@@ -56,11 +59,16 @@ public:
 		return this->size_;
 	}
 
+	[[nodiscard]] std::size_t WantedByteSize() const {
+		return this->wantedSize_;
+	}
+
 	[[nodiscard]] bool HoldsStruct() const {
 		return this->size_ != 0;
 	}
 
 private:
-	std::size_t size_ = 0;
+	std::size_t size_{0};
+	std::size_t wantedSize_{ 0 };
 	std::unique_ptr<int64_t[]> data_;
 };
