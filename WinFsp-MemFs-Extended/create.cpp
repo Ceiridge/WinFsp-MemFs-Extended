@@ -1,10 +1,10 @@
 #include <Windows.h>
 #include <sddl.h>
-#include <unordered_map>
 
 #include "memfs.h"
 #include "exceptions.h"
 #include "utils.h"
+#include "memfs-interface.h"
 
 using namespace Memfs;
 
@@ -68,7 +68,8 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	wcscpy_s(volumeParams.FileSystemName, sizeof volumeParams.FileSystemName / sizeof(WCHAR),
 	         nullptr != fileSystemName ? fileSystemName : L"-MEMEFS");
 
-	status = FspFileSystemCreate(devicePath, &volumeParams, &MemfsInterface, &this->fileSystem);
+	std::wstring devicePathMut{devicePath};
+	status = FspFileSystemCreate(devicePathMut.data(), &volumeParams, &Interface::Interface, &this->fileSystem);
 	if (!NT_SUCCESS(status)) {
 		MemfsFileNodeMapDelete(Memfs->FileNodeMap);
 		LocalFree(rootSecurity);
@@ -119,19 +120,15 @@ MemFs::~MemFs() {
 
 void MemFs::Destroy() {
 	if (this->fileSystem) {
-		FspFileSystemDelete(this->fileSystem.get());
-		this->fileSystem.reset();
+		FspFileSystemDelete(this->fileSystem);
+		this->fileSystem = nullptr;
 	}
 }
 
 NTSTATUS MemFs::Start() const {
-	return FspFileSystemStartDispatcher(this->fileSystem.get(), 0);
+	return FspFileSystemStartDispatcher(this->fileSystem, 0);
 }
 
 void MemFs::Stop() const {
-	FspFileSystemStopDispatcher(this->fileSystem.get());
-}
-
-FSP_FILE_SYSTEM* MemFs::GetRawFileSystem() const {
-	return this->fileSystem.get();
+	FspFileSystemStopDispatcher(this->fileSystem);
 }

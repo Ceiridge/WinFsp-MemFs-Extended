@@ -17,7 +17,6 @@
 #pragma once
 
 #include <winfsp/winfsp.h>
-#include <memory>
 #include <mutex>
 #include <unordered_map>
 
@@ -39,26 +38,33 @@ namespace Memfs {
 	public:
 		MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const wchar_t* volumePrefix, const wchar_t* volumeLabel, const wchar_t* rootSddl);
 		~MemFs();
-
-		void Destroy();
-
-		[[nodiscard]] NTSTATUS Start() const;
-		void Stop() const;
-
-		FSP_FILE_SYSTEM* GetRawFileSystem() const;
-
-		// TODO: Create funnel, test constructors and operators, rest of functions, separate
-
 		explicit MemFs(const MemFs& other) = delete;
 		MemFs(MemFs&& other) noexcept = delete;
 
 		MemFs& operator=(const MemFs& other) = delete;
 		MemFs& operator=(MemFs&& other) noexcept = delete;
 
+		void Destroy();
+
+		[[nodiscard]] NTSTATUS Start() const;
+		void Stop() const;
+
+		[[nodiscard]] FSP_FILE_SYSTEM* GetRawFileSystem() const;
+
+		UINT64 GetUsedTotalSize();
+		UINT64 CalculateMaxTotalSize();
+		UINT64 CalculateAvailableTotalSize();
+
+		std::wstring& GetVolumeLabel();
+		void SetVolumeLabel(const std::wstring& str);
+
 	private:
-		std::unique_ptr<FSP_FILE_SYSTEM> fileSystem{};
+		FSP_FILE_SYSTEM* fileSystem{};
 
 		UINT64 maxFsSize;
+		UINT64 cachedMaxFsSize;
+		UINT64 lastCacheTime;
+
 		std::wstring volumeLabel{L"MEMEFS"};
 
 		std::unordered_map<MEMFS_FILE_NODE*, UINT64> toBeDeletedFileNodeSizes;

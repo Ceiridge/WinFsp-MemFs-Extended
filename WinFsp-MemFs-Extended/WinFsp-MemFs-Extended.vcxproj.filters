@@ -16,6 +16,9 @@
     <Filter Include="Quelldateien\utils">
       <UniqueIdentifier>{45b1e6c7-437f-4d6b-a02a-124c55b11ccd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Quelldateien\interface">
+      <UniqueIdentifier>{8f10f0c0-2e21-459f-9690-a9b2ecf9fe87}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="memfs.cpp">
@@ -33,6 +36,21 @@
     <ClCompile Include="utils.cpp">
       <Filter>Quelldateien\utils</Filter>
     </ClCompile>
+    <ClCompile Include="volumeinfo.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </ClCompile>
+    <ClCompile Include="totalsize.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="basic.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="other.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </ClCompile>
+    <ClCompile Include="security.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="memfs.h">
@@ -43,6 +61,9 @@
     </ClInclude>
     <ClInclude Include="utils.h">
       <Filter>Quelldateien\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="memfs-interface.h">
+      <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
