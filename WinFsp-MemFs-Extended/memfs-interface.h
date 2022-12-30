@@ -2,6 +2,8 @@
 
 #include <winfsp/winfsp.h>
 
+#include "memfs.h"
+
 namespace Memfs::Interface {
 	static constexpr UINT16 MAX_VOLUME_LABEL_STR_LENGTH = 32;
 

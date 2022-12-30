@@ -1,9 +1,8 @@
 #include "memfs-interface.h"
-#include "memfs.h"
 
 namespace Memfs::Interface {
 	static NTSTATUS GetSecurityByName(FSP_FILE_SYSTEM* fileSystem, PWSTR fileName, PUINT32 pFileAttributes, PSECURITY_DESCRIPTOR securityDescriptor, SIZE_T* pSecurityDescriptorSize) {
-		MemFs memfs = GetMemFs(fileSystem);
+		MemFs* memfs = GetMemFs(fileSystem);
 		NTSTATUS result;
 
 		MEMFS_FILE_NODE* fileNode = MemfsFileNodeMapGet(memfs->FileNodeMap, fileName);

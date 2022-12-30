@@ -8,46 +8,51 @@
 
 #include "sectors.h"
 #include "comparisons.h"
+#include "dynamicstruct.h"
 
 namespace Memfs {
-	using FileNodeEaMap = std::map<std::string, std::unique_ptr<FILE_FULL_EA_INFORMATION>, Utils::EaLess>;
+	using FileNodeEaMap = std::map<std::string, DynamicStruct<FILE_FULL_EA_INFORMATION>, Utils::EaLess>;
 
 	class FileNode {
 	public:
 		std::wstring fileName; // Has to be constrained!
 		FSP_FSCTL_FILE_INFO fileInfo{};
 
+		DynamicStruct<SECURITY_DESCRIPTOR> fileSecurity;
+		DynamicStruct<byte> reparseData;
+
 		explicit FileNode(const std::wstring& fileName);
 		~FileNode() = default;
 		explicit FileNode(const FileNode& other) = delete;
 		FileNode& operator=(const FileNode& other) = delete;
-		explicit FileNode(FileNode&& other) noexcept;
-		FileNode& operator=(FileNode&& other) noexcept = delete;
+		explicit FileNode(FileNode&& other) noexcept = default;
+		FileNode& operator=(FileNode&& other) noexcept = default;
 
 		void Reference();
 		void Dereference();
 
 		void CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const;
 
+		bool IsMainNode();
+		std::weak_ptr<FileNode>& GetMainNode();
+		void SetMainNode(std::weak_ptr<FileNode> mainNode);
+
 		FileNodeEaMap& GetEaMap();
 		void SetEa(PFILE_FULL_EA_INFORMATION ea);
 		bool NeedsEa();
+
+		SectorNode& GetSectorNode();
 
 	private:
 		// Don't forget to update the move constructor if adding new variables here
 		void EnsureFileNameLength() const; // Constrains filename with exceptions
 
 		SectorNode sectors;
-
-		size_t fileSecuritySize{0};
-		std::unique_ptr<SECURITY_DESCRIPTOR> fileSecurity;
-
-		size_t reparseDataSize{0};
-		std::unique_ptr<void> reparseData;
-
 		volatile long refCount{0};
 
 		std::weak_ptr<FileNode> mainFileNode;
 		std::optional<FileNodeEaMap> eaMap;
 	};
+
+	static NTSTATUS CompatFspFileNodeSetEa(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode, PFILE_FULL_EA_INFORMATION ea);
 }

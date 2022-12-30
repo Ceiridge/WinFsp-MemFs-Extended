@@ -161,27 +161,6 @@ typedef struct _MEMFS
 // memefs: Use static global Memfs instance for easier access
 static MEMFS* GlobalMemfs = 0;
 
-static inline
-BOOLEAN MemfsFileNodeMapHasChild(MEMFS_FILE_NODE_MAP* FileNodeMap, MEMFS_FILE_NODE* FileNode)
-{
-    BOOLEAN Result = FALSE;
-    WCHAR Root[2] = L"\\";
-    PWSTR Remain, Suffix;
-    MEMFS_FILE_NODE_MAP::iterator iter = FileNodeMap->upper_bound(FileNode->FileName);
-    for (; FileNodeMap->end() != iter; ++iter)
-    {
-#if defined(MEMFS_NAMED_STREAMS)
-        if (0 != wcschr(iter->second->FileName, L':'))
-            continue;
-#endif
-        FspPathSuffix(iter->second->FileName, &Remain, &Suffix, Root);
-        Result = 0 == MemfsFileNameCompare(Remain, -1, FileNode->FileName, -1,
-            MemfsFileNodeMapIsCaseInsensitive(FileNodeMap));
-        FspPathCombine(iter->second->FileName, Suffix);
-        break;
-    }
-    return Result;
-}
 
 static inline
 BOOLEAN MemfsFileNodeMapEnumerateChildren(MEMFS_FILE_NODE_MAP* FileNodeMap, MEMFS_FILE_NODE* FileNode,

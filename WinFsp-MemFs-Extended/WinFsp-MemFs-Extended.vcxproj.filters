@@ -63,6 +63,12 @@
     <ClCompile Include="filemap.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="open.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </ClCompile>
+    <ClCompile Include="nodes-compat.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="memfs.h">
@@ -84,6 +90,9 @@
       <Filter>Quelldateien\utils</Filter>
     </ClInclude>
     <ClInclude Include="nodes.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="dynamicstruct.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

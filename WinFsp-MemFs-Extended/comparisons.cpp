@@ -3,8 +3,8 @@
 #include "comparisons.h"
 
 namespace Memfs::Utils {
-	static int FileNameCompare(PWSTR a, int alen, PWSTR b, int blen, BOOLEAN caseInsensitive) {
-		PWSTR p, endp, partp, q, endq, partq;
+	static int FileNameCompare(const PCWSTR a, int alen, const PCWSTR b, int blen, const BOOLEAN caseInsensitive) {
+		PCWSTR p, endp, partp, q, endq, partq;
 		WCHAR c, d;
 		int plen, qlen, len, res;
 
@@ -47,8 +47,7 @@ namespace Memfs::Utils {
 					res -= 2;
 				else
 					res = _wcsnicmp(partp, partq, len);
-			}
-			else
+			} else
 				res = wcsncmp(partp, partq, len);
 
 			if (0 == res)
@@ -61,16 +60,16 @@ namespace Memfs::Utils {
 		return -(endp <= p) + (endq <= q);
 	}
 
-	static BOOLEAN FileNameHasPrefix(PWSTR a, PWSTR b, BOOLEAN caseInsensitive) {
+	static BOOLEAN FileNameHasPrefix(const PCWSTR a, const PCWSTR b, const BOOLEAN caseInsensitive) {
 		int alen = (int)wcslen(a);
 		int blen = (int)wcslen(b);
 
 		return alen >= blen && 0 == FileNameCompare(a, blen, b, blen, caseInsensitive) &&
-			(alen == blen || (1 == blen && L'\\' == b[0]) ||
-				(L'\\' == a[blen] || L':' == a[blen]));
+		(alen == blen || (1 == blen && L'\\' == b[0]) ||
+			(L'\\' == a[blen] || L':' == a[blen]));
 	}
 
-	static int EaNameCompare(PSTR a, PSTR b) {
+	static int EaNameCompare(const PCSTR a, const PCSTR b) {
 		/* EA names are always case-insensitive in MEMFS (to be inline with NTFS) */
 
 		int res;
@@ -84,11 +83,11 @@ namespace Memfs::Utils {
 		return res;
 	}
 
-	bool EaLess::operator()(PSTR a, PSTR b) const {
-		return 0 > EaNameCompare(a, b);
+	bool EaLess::operator()(const std::string_view& a, const std::string_view& b) const {
+		return 0 > EaNameCompare(a.data(), b.data());
 	}
 
-	bool FileLess::operator()(PWSTR a, PWSTR b) const {
-		return 0 > FileNameCompare(a, -1, b, -1, this->CaseInsensitive);
+	bool FileLess::operator()(const std::wstring_view& a, const std::wstring_view& b) const {
+		return 0 > FileNameCompare(a.data(), a.length(), b.data(), b.length(), this->CaseInsensitive);
 	}
 }

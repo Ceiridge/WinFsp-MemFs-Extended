@@ -1,5 +1,4 @@
 #include "memfs-interface.h"
-#include "memfs.h"
 
 namespace Memfs::Interface {
 	static NTSTATUS GetVolumeInfo(FSP_FILE_SYSTEM* fileSystem, FSP_FSCTL_VOLUME_INFO* volumeInfo) {

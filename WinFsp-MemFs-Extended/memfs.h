@@ -65,6 +65,16 @@ namespace Memfs {
 		SectorManager& GetSectorManager();
 		void RecreateSectorManager();
 
+		[[nodiscard]] bool IsCaseInsensitive() const;
+		std::optional<FileNode&> FindFile(const std::wstring_view& fileName);
+		std::optional<FileNode&> FindMainFromStream(const std::wstring_view& fileName);
+		std::pair<NTSTATUS, std::optional<FileNode&>> FindParent(const std::wstring_view& fileName);
+		void TouchParent(const FileNode& node);
+		bool HasChild(const FileNode& node);
+
+		std::pair<NTSTATUS, FileNode&> InsertNode(FileNode&& node);
+		void RemoveNode(FileNode& node, const bool reportDeletedSize = true);
+
 	private:
 		FSP_FILE_SYSTEM* fileSystem{};
 
@@ -79,14 +89,6 @@ namespace Memfs {
 
 		// std::unordered_map<MEMFS_FILE_NODE*, UINT64> toBeDeletedFileNodeSizes;
 		// std::mutex toBeDeletedFileNodeMutex;
-
-		[[nodiscard]] bool IsCaseInsensitive() const;
-		std::optional<FileNode&> FindMainFromStream(const std::wstring_view fileName);
-		std::pair<NTSTATUS, std::optional<FileNode&>> FindParent(const std::wstring_view fileName);
-		void TouchParent(const FileNode& node);
-
-		NTSTATUS InsertNode(FileNode& node);
-		void RemoveNode(FileNode& node, const bool reportDeletedSize = true);
 	};
 
 	static inline MemFs* MEMFS_SINGLETON;

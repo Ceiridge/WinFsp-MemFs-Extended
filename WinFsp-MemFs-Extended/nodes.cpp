@@ -18,16 +18,11 @@ FileNode::FileNode(const std::wstring& fileName) : fileName(fileName) {
 	this->fileInfo.IndexNumber = IndexNumber++;
 }
 
-FileNode::FileNode(FileNode&& other) noexcept : fileName(std::move(other.fileName)), fileInfo(other.fileInfo), sectors(std::move(other.sectors)), fileSecuritySize(other.fileSecuritySize), fileSecurity(std::move(other.fileSecurity)), reparseDataSize(other.reparseDataSize), reparseData(std::move(other.reparseData)), refCount(other.refCount), mainFileNode(std::move(other.mainFileNode)), eaMap(std::move(other.eaMap)) {
-	this->EnsureFileNameLength();
-}
-
 void FileNode::EnsureFileNameLength() const {
 	if (this->fileName.length() >= MEMFS_MAX_PATH) {
 		throw FileNameTooLongException();
 	}
 }
-
 
 void FileNode::Reference() {
 	InterlockedIncrement(&this->refCount);
@@ -40,7 +35,7 @@ void FileNode::Dereference() {
 }
 
 void FileNode::CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const {
-	if (this->mainFileNode.expired()) {
+	if (this->IsMainNode()) {
 		*fileInfoDest = this->fileInfo;
 	} else {
 		const auto mainFile = this->mainFileNode.lock();
@@ -53,8 +48,20 @@ void FileNode::CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const {
 	}
 }
 
+bool FileNode::IsMainNode() const {
+	return this->mainFileNode.expired();
+}
+
+std::weak_ptr<FileNode>& FileNode::GetMainNode() {
+	return this->mainFileNode;
+}
+
+void FileNode::SetMainNode(const std::weak_ptr<FileNode> mainNode) {
+	this->mainFileNode = mainNode;
+}
+
 FileNodeEaMap& FileNode::GetEaMap() {
-	if (!this->mainFileNode.expired()) {
+	if (!this->IsMainNode()) {
 		return this->mainFileNode.lock()->GetEaMap();
 	}
 
@@ -66,6 +73,7 @@ FileNodeEaMap& FileNode::GetEaMap() {
 }
 
 void FileNode::SetEa(PFILE_FULL_EA_INFORMATION ea) {
+	auto& fileNodeEaDynamic = *static_cast<DynamicStruct<FILE_FULL_EA_INFORMATION>*>(nullptr);
 	FILE_FULL_EA_INFORMATION* fileNodeEa = nullptr;
 	ULONG eaSizePlus = 0, eaSizeMinus = 0;
 
@@ -75,10 +83,9 @@ void FileNode::SetEa(PFILE_FULL_EA_INFORMATION ea) {
 		eaSizePlus = FIELD_OFFSET(FILE_FULL_EA_INFORMATION, EaName) +
 			ea->EaNameLength + 1 + ea->EaValueLength;
 
-		// This is horrible and better not cause memory leaks
-		const size_t requiredInts = eaSizePlus / sizeof(int32_t) + 1;
-		fileNodeEa = reinterpret_cast<FILE_FULL_EA_INFORMATION*>(new int32_t[requiredInts]);
-		memcpy_s(fileNodeEa, requiredInts * sizeof(int32_t), ea, eaSizePlus);
+		fileNodeEaDynamic = DynamicStruct<FILE_FULL_EA_INFORMATION>(eaSizePlus);
+		fileNodeEa = fileNodeEaDynamic.Struct();
+		memcpy_s(fileNodeEa, fileNodeEaDynamic.ByteSize(), ea, eaSizePlus);
 
 		fileNodeEa->NextEntryOffset = 0;
 
@@ -91,11 +98,10 @@ void FileNode::SetEa(PFILE_FULL_EA_INFORMATION ea) {
 		eaMap.erase(p); // Now, here the old ea is hopefully freed
 	}
 
-	if (0 != ea->EaValueLength) {
+	if (0 != ea->EaValueLength && &fileNodeEaDynamic != nullptr) {
 		try {
-			eaMap.insert(FileNodeEaMap::value_type(fileNodeEa->EaName, fileNodeEa));
+			eaMap.insert(FileNodeEaMap::value_type(fileNodeEa->EaName, std::move(fileNodeEaDynamic)));
 		} catch (...) {
-			delete fileNodeEa;
 			throw CreateException(STATUS_INSUFFICIENT_RESOURCES);
 		}
 	}
@@ -104,7 +110,7 @@ void FileNode::SetEa(PFILE_FULL_EA_INFORMATION ea) {
 }
 
 bool FileNode::NeedsEa() {
-	if (!this->mainFileNode.expired()) {
+	if (!this->IsMainNode()) {
 		return this->mainFileNode.lock()->NeedsEa();
 	}
 
@@ -119,4 +125,8 @@ bool FileNode::NeedsEa() {
 	}
 
 	return false;
+}
+
+SectorNode& FileNode::GetSectorNode() {
+	return this->sectors;
 }

@@ -1,5 +1,3 @@
-#include <filesystem>
-
 #include "memfs.h"
 #include "utils.h"
 
@@ -9,7 +7,16 @@ bool MemFs::IsCaseInsensitive() const {
 	return this->fileMap.key_comp().CaseInsensitive;
 }
 
-std::optional<FileNode&> MemFs::FindMainFromStream(const std::wstring_view fileName) {
+std::optional<FileNode&> MemFs::FindFile(const std::wstring_view& fileName) {
+	const auto iter = this->fileMap.find(fileName);
+	if (iter == this->fileMap.end()) {
+		return {};
+	}
+
+	return iter->second;
+}
+
+std::optional<FileNode&> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
 	const auto colonPos = std::ranges::find(fileName, L':');
 	std::wstring mainName;
 
@@ -24,12 +31,11 @@ std::optional<FileNode&> MemFs::FindMainFromStream(const std::wstring_view fileN
 		return {};
 	}
 
-	return {iter->second};
+	return iter->second;
 }
 
-std::pair<NTSTATUS, std::optional<FileNode&>> MemFs::FindParent(const std::wstring_view fileName) {
-	const std::filesystem::path filePath = fileName;
-	const auto parentPath = filePath.parent_path().make_preferred();
+std::pair<NTSTATUS, std::optional<FileNode&>> MemFs::FindParent(const std::wstring_view& fileName) {
+	const auto parentPath = Utils::PathSuffix(fileName).RemainPrefix;
 
 	const auto iter = this->fileMap.find(parentPath);
 	if (iter == this->fileMap.end()) {
@@ -40,7 +46,7 @@ std::pair<NTSTATUS, std::optional<FileNode&>> MemFs::FindParent(const std::wstri
 		return {STATUS_NOT_A_DIRECTORY, {}};
 	}
 
-	return {STATUS_SUCCESS, {iter->second}};
+	return {STATUS_SUCCESS, iter->second};
 }
 
 void MemFs::TouchParent(const FileNode& node) {
@@ -56,7 +62,23 @@ void MemFs::TouchParent(const FileNode& node) {
 	}
 }
 
-NTSTATUS MemFs::InsertNode(FileNode& node) {
+bool MemFs::HasChild(const FileNode& node) {
+	bool result = false;
+
+	for (auto iter = this->fileMap.upper_bound(node.fileName); this->fileMap.end() != iter; ++iter) {
+		if (iter->second.fileName.find(L':') != std::wstring::npos) {
+			continue;
+		}
+
+		const auto [remainPrefix, suffix] = Utils::PathSuffix(iter->second.fileName);
+		result = 0 == Utils::FileNameCompare(remainPrefix.data(), remainPrefix.length(), node.fileName.c_str(), node.fileName.length(), this->IsCaseInsensitive());
+		break;
+	}
+
+	return result;
+}
+
+std::pair<NTSTATUS, FileNode&> MemFs::InsertNode(FileNode&& node) {
 	try {
 		const auto [iter, success] = this->fileMap.insert(FileNodeMap::value_type(node.fileName, std::move(node)));
 
@@ -65,9 +87,9 @@ NTSTATUS MemFs::InsertNode(FileNode& node) {
 			this->TouchParent(iter->second);
 		}
 
-		return STATUS_SUCCESS;
+		return { STATUS_SUCCESS, iter->second };
 	} catch (...) {
-		return STATUS_INSUFFICIENT_RESOURCES;
+		return { STATUS_INSUFFICIENT_RESOURCES, node };
 	}
 }
 

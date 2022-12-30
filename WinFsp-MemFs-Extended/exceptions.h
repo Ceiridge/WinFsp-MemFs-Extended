@@ -9,6 +9,7 @@ namespace Memfs {
 		explicit CreateException(const NTSTATUS status);
 
 		[[nodiscard]] char const* what() const override;
+		[[nodiscard]] NTSTATUS Which() const;
 
 	private:
 		NTSTATUS status;
