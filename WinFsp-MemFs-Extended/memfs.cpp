@@ -759,37 +759,6 @@ static NTSTATUS ResolveReparsePoints(FSP_FILE_SYSTEM* FileSystem,
         PIoStatus, Buffer, PSize);
 }
 
-static NTSTATUS GetReparsePointByName(
-    FSP_FILE_SYSTEM* FileSystem, PVOID Context,
-    PWSTR FileName, BOOLEAN IsDirectory, PVOID Buffer, PSIZE_T PSize)
-{
-    MEMFS* Memfs = (MEMFS*)FileSystem->UserContext;
-    MEMFS_FILE_NODE* FileNode;
-
-#if defined(MEMFS_NAMED_STREAMS)
-    /* GetReparsePointByName will never receive a named stream */
-    assert(0 == wcschr(FileName, L':'));
-#endif
-
-    FileNode = MemfsFileNodeMapGet(Memfs->FileNodeMap, FileName);
-    if (0 == FileNode)
-        return STATUS_OBJECT_NAME_NOT_FOUND;
-
-    if (0 == (FileNode->FileInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
-        return STATUS_NOT_A_REPARSE_POINT;
-
-    if (0 != Buffer)
-    {
-        if (FileNode->ReparseDataSize > *PSize)
-            return STATUS_BUFFER_TOO_SMALL;
-
-        *PSize = FileNode->ReparseDataSize;
-        memcpy(Buffer, FileNode->ReparseData, FileNode->ReparseDataSize);
-    }
-
-    return STATUS_SUCCESS;
-}
-
 static NTSTATUS GetReparsePoint(FSP_FILE_SYSTEM* FileSystem,
     PVOID FileNode0,
     PWSTR FileName, PVOID Buffer, PSIZE_T PSize)
