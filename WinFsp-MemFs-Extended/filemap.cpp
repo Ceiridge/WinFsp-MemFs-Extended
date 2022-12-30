@@ -87,9 +87,9 @@ std::pair<NTSTATUS, FileNode&> MemFs::InsertNode(FileNode&& node) {
 			this->TouchParent(iter->second);
 		}
 
-		return { STATUS_SUCCESS, iter->second };
+		return {STATUS_SUCCESS, iter->second};
 	} catch (...) {
-		return { STATUS_INSUFFICIENT_RESOURCES, node };
+		return {STATUS_INSUFFICIENT_RESOURCES, node};
 	}
 }
 
@@ -103,4 +103,23 @@ void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
 		this->TouchParent(node); // TODO: Might be out of scope here?
 		node.Dereference();
 	}
+}
+
+std::vector<FileNode*> MemFs::EnumerateNamedStreams(const FileNode& node, const bool references) {
+	std::vector<FileNode*> namedStreams;
+
+	for (auto iter = this->fileMap.upper_bound(node.fileName); this->fileMap.end() != iter; ++iter) {
+		if (!Utils::FileNameHasPrefix(iter->second.fileName.c_str(), node.fileName.c_str(), this->IsCaseInsensitive()))
+			break;
+		if (L':' != iter->second.fileName[node.fileName.length()])
+			break;
+
+		if (references) {
+			iter->second.Reference();
+		}
+
+		namedStreams.push_back(&iter->second);
+	}
+
+	return namedStreams;
 }

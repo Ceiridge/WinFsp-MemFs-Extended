@@ -63,7 +63,7 @@
     <ClCompile Include="filemap.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="open.cpp">
+    <ClCompile Include="filecreate.cpp">
       <Filter>Quelldateien\interface</Filter>
     </ClCompile>
     <ClCompile Include="nodes-compat.cpp">

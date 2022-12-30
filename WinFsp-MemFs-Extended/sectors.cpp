@@ -176,3 +176,7 @@ SectorNode& SectorNode::operator=(SectorNode&& other) noexcept {
 	this->Sectors = std::move(other.Sectors);
 	return *this;
 }
+
+size_t SectorNode::ApproximateSize() const {
+	return this->Sectors.size() * (sizeof(Sector) + sizeof(Sector*));
+}

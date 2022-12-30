@@ -75,6 +75,8 @@ namespace Memfs {
 		std::pair<NTSTATUS, FileNode&> InsertNode(FileNode&& node);
 		void RemoveNode(FileNode& node, const bool reportDeletedSize = true);
 
+		std::vector<FileNode*> EnumerateNamedStreams(const FileNode& node, const bool references);
+
 	private:
 		FSP_FILE_SYSTEM* fileSystem{};
 

@@ -1,4 +1,5 @@
 #include "exceptions.h"
+#include "memfs-interface.h"
 #include "nodes.h"
 
 namespace Memfs {
@@ -9,6 +10,51 @@ namespace Memfs {
 			node->SetEa(ea);
 		} catch (CreateException& ex) {
 			return ex.Which();
+		}
+
+		return STATUS_SUCCESS;
+	}
+
+	static NTSTATUS CompatSetFileSizeInternal(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize) {
+		MemFs* memfs = Interface::GetMemFs(fileSystem);
+		FileNode* fileNode = Interface::GetFileNode(fileNode0);
+
+		if (setAllocationSize) {
+			if (fileNode->fileInfo.AllocationSize != newSize) {
+				// memefs: Sector Reallocate
+				const SIZE_T oldSize = fileNode->GetSectorNode().ApproximateSize();
+				if (newSize - oldSize + memfs->GetUsedTotalSize() > memfs->CalculateMaxTotalSize()) {
+					return STATUS_DISK_FULL;
+				}
+
+
+				if (memfs->GetSectorManager().ReAllocate(fileNode->GetSectorNode(), newSize)) {
+					return STATUS_INSUFFICIENT_RESOURCES;
+				}
+
+				fileNode->fileInfo.AllocationSize = newSize;
+				if (fileNode->fileInfo.FileSize > newSize) {
+					fileNode->fileInfo.FileSize = newSize;
+				}
+			}
+		} else {
+			if (fileNode->fileInfo.FileSize != newSize) {
+				if (fileNode->fileInfo.AllocationSize < newSize) {
+					const UINT64 allocationUnit = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
+					const UINT64 allocationSize = (newSize + allocationUnit - 1) / allocationUnit * allocationUnit;
+
+					const NTSTATUS result = CompatSetFileSizeInternal(fileSystem, fileNode, allocationSize, true);
+					if (!NT_SUCCESS(result)) {
+						return result;
+					}
+				}
+
+				// memefs: No null-initialization?
+				// if (fileNode->fileInfo.FileSize < NewSize)
+				//    memset((PUINT8)FileNode->FileData + fileNode->fileInfo.FileSize, 0,
+				//        (size_t)(NewSize - fileNode->fileInfo.FileSize));
+				fileNode->fileInfo.FileSize = newSize;
+			}
 		}
 
 		return STATUS_SUCCESS;

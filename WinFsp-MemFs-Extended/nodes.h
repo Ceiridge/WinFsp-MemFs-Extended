@@ -28,18 +28,20 @@ namespace Memfs {
 		explicit FileNode(FileNode&& other) noexcept = default;
 		FileNode& operator=(FileNode&& other) noexcept = default;
 
+		long GetReferenceCount(const bool withInterlock = true);
 		void Reference();
 		void Dereference();
 
 		void CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const;
 
-		bool IsMainNode();
+		[[nodiscard]] bool IsMainNode() const;
 		std::weak_ptr<FileNode>& GetMainNode();
 		void SetMainNode(std::weak_ptr<FileNode> mainNode);
 
 		FileNodeEaMap& GetEaMap();
 		void SetEa(PFILE_FULL_EA_INFORMATION ea);
 		bool NeedsEa();
+		void DeleteEaMap();
 
 		SectorNode& GetSectorNode();
 
@@ -55,4 +57,5 @@ namespace Memfs {
 	};
 
 	static NTSTATUS CompatFspFileNodeSetEa(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode, PFILE_FULL_EA_INFORMATION ea);
+	static NTSTATUS CompatSetFileSizeInternal(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize);
 }

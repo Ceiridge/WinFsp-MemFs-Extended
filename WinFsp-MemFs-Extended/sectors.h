@@ -29,6 +29,8 @@ namespace Memfs {
 		SectorNode(SectorNode&& other) noexcept;
 		SectorNode& operator=(const SectorNode& other) = delete;
 		SectorNode& operator=(SectorNode&& other) noexcept;
+
+		[[nodiscard]] size_t ApproximateSize() const;
 	};
 
 	class SectorManager {

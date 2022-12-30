@@ -28,7 +28,7 @@
     <ClCompile Include="memfs.cpp" />
     <ClCompile Include="nodes-compat.cpp" />
     <ClCompile Include="nodes.cpp" />
-    <ClCompile Include="open.cpp" />
+    <ClCompile Include="filecreate.cpp" />
     <ClCompile Include="other.cpp" />
     <ClCompile Include="sectors.cpp" />
     <ClCompile Include="security.cpp" />

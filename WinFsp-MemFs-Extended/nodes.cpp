@@ -24,6 +24,14 @@ void FileNode::EnsureFileNameLength() const {
 	}
 }
 
+long FileNode::GetReferenceCount(const bool withInterlock) {
+	if (withInterlock) {
+		return InterlockedExchangeAdd(&this->refCount, 0L);
+	} else {
+		return this->refCount;
+	}
+}
+
 void FileNode::Reference() {
 	InterlockedIncrement(&this->refCount);
 }
@@ -125,6 +133,10 @@ bool FileNode::NeedsEa() {
 	}
 
 	return false;
+}
+
+void FileNode::DeleteEaMap() {
+	this->eaMap.reset();
 }
 
 SectorNode& FileNode::GetSectorNode() {
