@@ -116,6 +116,7 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 
 MemFs::~MemFs() {
 	this->Destroy();
+	// TODO: This might have a memory leak, because member variables are not deleted
 }
 
 void MemFs::Destroy() {

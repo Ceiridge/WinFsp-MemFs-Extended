@@ -51,6 +51,9 @@
     <ClCompile Include="security.cpp">
       <Filter>Quelldateien\interface</Filter>
     </ClCompile>
+    <ClCompile Include="sectors.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="memfs.h">
@@ -63,6 +66,9 @@
       <Filter>Quelldateien\utils</Filter>
     </ClInclude>
     <ClInclude Include="memfs-interface.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="sectors.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

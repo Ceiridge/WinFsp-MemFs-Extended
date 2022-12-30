@@ -314,13 +314,6 @@ BOOL SectorFree(MEMEFS_SECTOR_VECTOR* SectorVector, std::mutex* SectorVectorMute
  * MEMFS
  */
 
-static inline
-UINT64 MemfsGetSystemTime(VOID)
-{
-    FILETIME FileTime;
-    GetSystemTimeAsFileTime(&FileTime);
-    return ((PLARGE_INTEGER)&FileTime)->QuadPart;
-}
 
 static inline
 int MemfsFileNameCompare(PWSTR a, int alen, PWSTR b, int blen, BOOLEAN CaseInsensitive)
@@ -502,53 +495,6 @@ UINT64 MemefsGetUsedTotalSize(MEMFS* Memfs) {
 
     const SIZE_T sectorSizes = Memfs->AllocatedSectors * (sizeof(MEMEFS_SECTOR) + sizeof(MEMEFS_SECTOR*));
     return nodeMapSize + sectorSizes;
-}
-
-// memefs: This is required to update the maximum total size according to the available RAM that is left
-static inline
-UINT64 MemefsGetMaxTotalSize(MEMFS* Memfs)
-{
-    if (Memfs->MaxFsSize != 0)
-    {
-        return Memfs->MaxFsSize;
-    }
-
-    const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs);
-    const UINT64 currentTicks = GetTickCount64();
-
-    // Limit calls to GlobalMemoryStatusEx with a 100ms cooldown to improve performance
-    if (currentTicks - Memfs->LastCacheTime < 100) {
-        return Memfs->CachedMaxFsSize + usedSize;
-    }
-
-    MEMORYSTATUSEX memoryStatus{};
-    memoryStatus.dwLength = sizeof(MEMORYSTATUSEX);
-    if (!GlobalMemoryStatusEx(&memoryStatus)) 
-    {
-        return 0;
-    }
-
-    // TODO: Check whether it should be limited by physical or virtual memory
-    const UINT64 availMemorySize = min(memoryStatus.ullAvailPhys, memoryStatus.ullAvailVirtual);
-
-    Memfs->CachedMaxFsSize = availMemorySize;
-    Memfs->LastCacheTime = currentTicks;
-
-    return availMemorySize + usedSize;
-}
-
-static inline
-UINT64 MemefsGetAvailableTotalSize(MEMFS* Memfs)
-{
-    const UINT64 totalSize = MemefsGetMaxTotalSize(Memfs);
-    const UINT64 usedSize = MemefsGetUsedTotalSize(Memfs);
-
-    if (usedSize >= totalSize)
-    {
-        return 0;
-    }
-
-    return totalSize - usedSize;
 }
 
 static inline

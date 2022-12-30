@@ -25,6 +25,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="memfs.cpp" />
     <ClCompile Include="other.cpp" />
+    <ClCompile Include="sectors.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="totalsize.cpp" />
     <ClCompile Include="utils.cpp" />
@@ -33,6 +34,7 @@
   <ItemGroup>
     <ClInclude Include="exceptions.h" />
     <ClInclude Include="memfs-interface.h" />
+    <ClInclude Include="sectors.h" />
     <ClInclude Include="memfs.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
