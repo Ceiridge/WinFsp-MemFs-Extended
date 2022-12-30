@@ -11,14 +11,18 @@ SectorManager::SectorManager() {
 }
 
 SectorManager::~SectorManager() {
-	HeapDestroy(this->heap);
+	HeapDestroy(this->heap); // Ignore errors
 }
 
-SectorManager::SectorManager(SectorManager&& other) noexcept : heap(std::move(other.heap)) {}
+SectorManager::SectorManager(SectorManager&& other) noexcept : heap(std::move(other.heap)), allocatedSectors(other.allocatedSectors) {
+	other.heap = nullptr;
+}
 
 SectorManager& SectorManager::operator=(SectorManager&& other) noexcept {
 	this->heap = other.heap;
 	other.heap = nullptr;
+	this->allocatedSectors = other.allocatedSectors;
+
 	return *this;
 }
 
@@ -47,9 +51,8 @@ bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
 
 	if (vectorSize < wantedSectorCount) {
 		// Allocate
-		// const SIZE_T sectorDifference = wantedSectorCount - vectorSize;
-		// TODO: Sector counter?
-		// InterlockedExchangeAdd(AllocatedSectorsCounter, sectorDifference);
+		const SIZE_T sectorDifference = wantedSectorCount - vectorSize;
+		InterlockedExchangeAdd(&this->allocatedSectors, sectorDifference); // TODO: Check if thread-safe
 
 		node.SectorsMutex.lock();
 		try {
@@ -91,7 +94,8 @@ bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
 
 		node.SectorsMutex.lock();
 		node.Sectors.resize(wantedSectorCount);
-		// InterlockedExchangeSubtract(AllocatedSectorsCounter, vectorSize - wantedSectorCount);
+		const UINT64 sectorDifference = vectorSize - wantedSectorCount;
+		InterlockedExchangeSubtract(&this->allocatedSectors, sectorDifference);
 		node.SectorsMutex.unlock();
 	}
 

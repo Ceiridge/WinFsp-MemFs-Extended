@@ -20,6 +20,8 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "sectors.h"
+
 namespace Memfs {
 	static constexpr int MEMFS_MAX_PATH = 512;
 	static constexpr UINT64 MEMFS_SECTOR_SIZE = 512;
@@ -60,6 +62,7 @@ namespace Memfs {
 
 	private:
 		FSP_FILE_SYSTEM* fileSystem{};
+		SectorManager sectors;
 
 		UINT64 maxFsSize;
 		UINT64 cachedMaxFsSize;

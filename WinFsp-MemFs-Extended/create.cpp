@@ -28,8 +28,6 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 		throw CreateException(FspNtStatusFromWin32(GetLastError()));
 	}
 
-	SectorInitialize();
-
 	NTSTATUS status = MemfsFileNodeMapCreate(caseInsensitive, &Memfs->FileNodeMap);
 	if (!NT_SUCCESS(status)) {
 		LocalFree(rootSecurity);
@@ -116,7 +114,7 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 
 MemFs::~MemFs() {
 	this->Destroy();
-	// TODO: This might have a memory leak, because member variables are not deleted
+	// TODO: This might have a memory leak, because member variables are not deleted, including the SectorManager
 }
 
 void MemFs::Destroy() {

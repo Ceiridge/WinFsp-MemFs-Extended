@@ -41,5 +41,6 @@ namespace Memfs {
 		bool Free(SectorNode& node);
 	private:
 		HANDLE heap;
+		volatile UINT64 allocatedSectors{0};
 	};
 }
