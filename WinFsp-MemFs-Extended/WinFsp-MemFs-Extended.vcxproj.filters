@@ -54,6 +54,9 @@
     <ClCompile Include="sectors.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="comparisons.cpp">
+      <Filter>Quelldateien\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="memfs.h">
@@ -70,6 +73,9 @@
     </ClInclude>
     <ClInclude Include="sectors.h">
       <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="comparisons.h">
+      <Filter>Quelldateien\utils</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
