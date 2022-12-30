@@ -72,6 +72,9 @@
     <ClCompile Include="io.cpp">
       <Filter>Quelldateien\interface</Filter>
     </ClCompile>
+    <ClCompile Include="fileinfo.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="memfs.h">

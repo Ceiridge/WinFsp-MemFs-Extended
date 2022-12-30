@@ -117,9 +117,24 @@ std::vector<FileNode*> MemFs::EnumerateNamedStreams(const FileNode& node, const 
 		if (references) {
 			iter->second.Reference();
 		}
-
 		namedStreams.push_back(&iter->second);
 	}
 
 	return namedStreams;
+}
+
+std::vector<FileNode*> MemFs::EnumerateDescendants(const FileNode& node, const bool references) {
+	std::vector<FileNode*> descendants;
+
+	for (auto iter = this->fileMap.lower_bound(node.fileName); this->fileMap.end() != iter; ++iter) {
+		if (!Utils::FileNameHasPrefix(iter->second.fileName.c_str(), node.fileName.c_str(), this->IsCaseInsensitive()))
+			break;
+
+		if (references) {
+			iter->second.Reference();
+		}
+		descendants.push_back(&iter->second);
+	}
+
+	return descendants;
 }

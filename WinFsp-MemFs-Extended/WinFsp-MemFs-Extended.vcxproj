@@ -23,6 +23,7 @@
     <ClCompile Include="comparisons.cpp" />
     <ClCompile Include="create.cpp" />
     <ClCompile Include="exceptions.cpp" />
+    <ClCompile Include="fileinfo.cpp" />
     <ClCompile Include="filemap.cpp" />
     <ClCompile Include="io.cpp" />
     <ClCompile Include="main.cpp" />

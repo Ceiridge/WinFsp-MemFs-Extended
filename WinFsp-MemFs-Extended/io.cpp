@@ -63,4 +63,14 @@ namespace Memfs::Interface {
 		fileNode->CopyFileInfo(fileInfo);
 		return STATUS_SUCCESS;
 	}
+
+	NTSTATUS Flush(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, FSP_FSCTL_FILE_INFO* fileInfo) {
+		const FileNode* fileNode = GetFileNode(fileNode0);
+
+		if (fileNode != nullptr) {
+			fileNode->CopyFileInfo(fileInfo);
+		}
+
+		return STATUS_SUCCESS;
+	}
 }

@@ -76,6 +76,7 @@ namespace Memfs {
 		void RemoveNode(FileNode& node, const bool reportDeletedSize = true);
 
 		std::vector<FileNode*> EnumerateNamedStreams(const FileNode& node, const bool references);
+		std::vector<FileNode*> EnumerateDescendants(const FileNode& node, const bool references);
 
 	private:
 		FSP_FILE_SYSTEM* fileSystem{};
