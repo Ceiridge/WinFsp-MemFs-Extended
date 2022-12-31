@@ -193,7 +193,7 @@ namespace Memfs::Interface {
 
 		for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, true)) {
 			const volatile long refCount = namedStream->GetReferenceCount(true);
-			MemoryBarrier(); // Remove this barrier in the future
+
 			if (2 >= refCount) {
 				memfs->RemoveNode(*namedStream);
 			}

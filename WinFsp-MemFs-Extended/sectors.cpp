@@ -134,7 +134,7 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 	const SIZE_T offsetOffset = offset - downAlignedOffset;
 
 	UINT64 sectorEnd = offsetSectorBegin + GetSectorAmount(AlignSize(size)) - 1;
-	if (offsetOffset > 0) {
+	if (offsetOffset > 0) {  // TODO: FIX OFF BY ONE SECTOREND
 		sectorEnd++; // Needs to read one more sector to account for the bytes from the first sector to receive the full length
 	}
 

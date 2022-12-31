@@ -47,6 +47,7 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	volumeParams.ReparsePointsAccessCheck = false;
 	volumeParams.NamedStreams = true;
 	volumeParams.PostCleanupWhenModifiedOnly = true;
+	volumeParams.PostDispositionWhenNecessaryOnly = true;
 	volumeParams.PassQueryDirectoryFileName = true;
 	volumeParams.ExtendedAttributes = true;
 	volumeParams.FlushAndPurgeOnCleanup = flushAndPurgeOnCleanup;

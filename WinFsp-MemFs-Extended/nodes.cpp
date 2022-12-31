@@ -30,7 +30,7 @@ void FileNode::EnsureFileNameLength() const {
 
 long FileNode::GetReferenceCount(const bool withInterlock) {
 	if (withInterlock) {
-		return InterlockedExchangeAdd(&this->refCount, 0L);
+		return FspInterlockedLoad32(reinterpret_cast<INT32 volatile*>(&this->refCount));
 	} else {
 		return this->refCount;
 	}

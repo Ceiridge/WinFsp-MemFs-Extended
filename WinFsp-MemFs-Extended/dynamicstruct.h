@@ -14,22 +14,17 @@ public:
 	 * \brief Allocates a dynamic struct
 	 * \param size The exact size in bytes of the struct
 	 */
-	explicit DynamicStruct(std::size_t size) {
-		const bool fraction = size % sizeof(int64_t) != 0;
-		const std::size_t requiredInt64s = size / sizeof(int64_t) + (fraction ? 1 : 0); // + 1 if not divisible
-
+	explicit DynamicStruct(const std::size_t size) {
 		wantedSize_ = size;
-		size_ = requiredInt64s * sizeof(int64_t);
-		data_ = std::unique_ptr<int64_t[]>(new int64_t[requiredInt64s]);
+		data_ = std::unique_ptr<int64_t[]>(new int64_t[this->RequiredInt64Amount()]);
 	}
 
 	~DynamicStruct() = default;
 
 	DynamicStruct(const DynamicStruct& other) {
 		wantedSize_ = other.wantedSize_;
-		size_ = other.size_;
-		data_ = std::make_unique<int64_t[]>(size_);
-		std::memcpy(data_.get(), other.data_.get(), size_ * sizeof(int64_t));
+		data_ = std::unique_ptr<int64_t[]>(new int64_t[this->RequiredInt64Amount()]);
+		std::memcpy(data_.get(), other.data_.get(), this->ByteSize());
 	}
 
 	DynamicStruct(DynamicStruct&& other) noexcept = default;
@@ -37,9 +32,8 @@ public:
 	DynamicStruct& operator=(const DynamicStruct& other) {
 		if (this != &other) {
 			wantedSize_ = other.wantedSize_;
-			size_ = other.size_;
-			data_ = std::make_unique<int64_t[]>(size_);
-			std::memcpy(data_.get(), other.data_.get(), size_ * sizeof(int64_t));
+			data_ = std::unique_ptr<int64_t[]>(new int64_t[this->RequiredInt64Amount()]);
+			std::memcpy(data_.get(), other.data_.get(), this->ByteSize());
 		}
 
 		return *this;
@@ -57,7 +51,7 @@ public:
 	}
 
 	[[nodiscard]] std::size_t ByteSize() const {
-		return this->size_;
+		return this->RequiredInt64Amount() * sizeof(int64_t);
 	}
 
 	[[nodiscard]] std::size_t WantedByteSize() const {
@@ -65,11 +59,15 @@ public:
 	}
 
 	[[nodiscard]] bool HoldsStruct() const {
-		return this->size_ != 0;
+		return this->data_;
 	}
 
 private:
-	std::size_t size_{0};
-	std::size_t wantedSize_{ 0 };
+	[[nodiscard]] std::size_t RequiredInt64Amount() const {
+		const bool fraction = this->wantedSize_ % sizeof(int64_t) != 0;
+		return this->wantedSize_ / sizeof(int64_t) + (fraction ? 1 : 0); // + 1 if not divisible
+	}
+
+	std::size_t wantedSize_{0};
 	std::unique_ptr<int64_t[]> data_;
 };
