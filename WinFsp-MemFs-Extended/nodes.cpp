@@ -127,7 +127,7 @@ std::refoptional<FileNodeEaMap> FileNode::GetEaMapOpt() {
 }
 
 void FileNode::SetEa(PFILE_FULL_EA_INFORMATION ea) {
-	auto& fileNodeEaDynamic = *static_cast<DynamicStruct<FILE_FULL_EA_INFORMATION>*>(nullptr);
+	DynamicStruct<FILE_FULL_EA_INFORMATION> fileNodeEaDynamic;
 	FILE_FULL_EA_INFORMATION* fileNodeEa = nullptr;
 	ULONG eaSizePlus = 0, eaSizeMinus = 0;
 
@@ -152,7 +152,7 @@ void FileNode::SetEa(PFILE_FULL_EA_INFORMATION ea) {
 		eaMap.erase(p); // Now, here the old ea is hopefully freed
 	}
 
-	if (0 != ea->EaValueLength && &fileNodeEaDynamic != nullptr) {
+	if (0 != ea->EaValueLength && fileNodeEaDynamic.HoldsStruct()) {
 		try {
 			eaMap.insert(FileNodeEaMap::value_type(fileNodeEa->EaName, std::move(fileNodeEaDynamic)));
 		} catch (...) {

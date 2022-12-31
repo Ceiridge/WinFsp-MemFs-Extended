@@ -54,7 +54,7 @@ namespace Memfs {
 
 		[[nodiscard]] bool IsCaseInsensitive() const;
 		std::refoptional<FileNode> FindFile(const std::wstring_view& fileName);
-		std::refoptional<FileNode> FindMainFromStream(const std::wstring_view& fileName);
+		std::refoptional<std::shared_ptr<FileNode>> FindMainFromStream(const std::wstring_view& fileName);
 		std::pair<NTSTATUS, std::refoptional<FileNode>> FindParent(const std::wstring_view& fileName);
 		void TouchParent(const FileNode& node);
 		bool HasChild(const FileNode& node);

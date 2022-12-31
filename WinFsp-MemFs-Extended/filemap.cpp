@@ -17,7 +17,7 @@ std::refoptional<FileNode> MemFs::FindFile(const std::wstring_view& fileName) {
 	return *iter->second;
 }
 
-std::refoptional<FileNode> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
+std::refoptional<std::shared_ptr<FileNode>> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
 	const auto colonPos = std::ranges::find(fileName, L':');
 	std::wstring mainName;
 
@@ -32,7 +32,7 @@ std::refoptional<FileNode> MemFs::FindMainFromStream(const std::wstring_view& fi
 		return {};
 	}
 
-	return *iter->second;
+	return iter->second;
 }
 
 std::pair<NTSTATUS, std::refoptional<FileNode>> MemFs::FindParent(const std::wstring_view& fileName) {
