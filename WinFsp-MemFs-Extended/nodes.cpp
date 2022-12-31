@@ -3,9 +3,12 @@
 #include "utils.h"
 #include "nodes.h"
 
+#include "memfs.h"
+
 using namespace Memfs;
 
-static UINT64 IndexNumber = 1;
+static volatile UINT64 IndexNumber = 1;
+static constexpr bool LOG_REFERENCES = false;
 
 FileNode::FileNode(const std::wstring& fileName) : fileName(fileName) {
 	this->EnsureFileNameLength();
@@ -35,11 +38,41 @@ long FileNode::GetReferenceCount(const bool withInterlock) {
 
 void FileNode::Reference() {
 	InterlockedIncrement(&this->refCount);
+
+	if (MEMFS_SINGLETON == nullptr) {
+		return;
+	}
+	auto& refMap = MEMFS_SINGLETON->GetRawRefMap();
+	if (!refMap.contains(this->fileInfo.IndexNumber)) {
+		refMap.insert_or_assign(this->fileInfo.IndexNumber, this->shared_from_this());
+	}
+
+	if (LOG_REFERENCES) {
+		FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"+%d for %s", this->refCount, this->fileName.c_str());
+	}
 }
 
-void FileNode::Dereference() {
-	if (InterlockedDecrement(&this->refCount) == 0) {
-		// TODO: Delete or does it happen automatically?
+void FileNode::Dereference(const bool toZero) {
+	volatile long newRefCount;
+
+	// Disabled due to it not working at all
+	if (toZero && false) {
+		InterlockedExchange(&this->refCount, 0ULL);
+		newRefCount = 0ULL;
+	} else {
+		newRefCount = InterlockedDecrement(&this->refCount);
+	}
+
+	if (LOG_REFERENCES) {
+		FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"-%d for %s", newRefCount, this->fileName.c_str());
+	}
+
+	if (newRefCount == 0ULL) {
+		if (LOG_REFERENCES) {
+			FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"Removing %s", this->fileName.c_str());
+		}
+
+		MEMFS_SINGLETON->GetRawRefMap().erase(this->fileInfo.IndexNumber);
 	}
 }
 

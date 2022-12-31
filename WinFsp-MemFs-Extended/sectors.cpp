@@ -112,7 +112,11 @@ bool SectorManager::Free(SectorNode& node) {
 }
 
 bool SectorManager::IsFullyEmpty() {
-	return InterlockedExchangeAdd(&this->allocatedSectors, 0ULL) == 0;
+	return this->GetAllocatedSectors() == 0;
+}
+
+UINT64 SectorManager::GetAllocatedSectors() {
+	return InterlockedExchangeAdd(&this->allocatedSectors, 0ULL);
 }
 
 template <bool IsReading>
@@ -171,6 +175,7 @@ SectorNode::~SectorNode() {
 	SectorManager& sectorManager = MEMFS_SINGLETON->GetSectorManager();
 	sectorManager.Free(*this);
 
+	// TODO: Free heap
 	// memefs: If fully empty, recreate the heap
 	/*if (sectorManager.IsFullyEmpty()) {
 		MEMFS_SINGLETON->RecreateSectorManager();

@@ -8,8 +8,8 @@ namespace Memfs::Interface {
 	}
 
 	NTSTATUS SetBasicInfo(FSP_FILE_SYSTEM* fileSystem,
-	                             PVOID fileNode0, UINT32 fileAttributes,
-	                             UINT64 creationTime, UINT64 lastAccessTime, UINT64 lastWriteTime, UINT64 changeTime, FSP_FSCTL_FILE_INFO* fileInfo) {
+	                      PVOID fileNode0, UINT32 fileAttributes,
+	                      UINT64 creationTime, UINT64 lastAccessTime, UINT64 lastWriteTime, UINT64 changeTime, FSP_FSCTL_FILE_INFO* fileInfo) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 		std::shared_ptr<FileNode> mainFileNodeShared;
 
@@ -39,8 +39,8 @@ namespace Memfs::Interface {
 	}
 
 	NTSTATUS SetFileSize(FSP_FILE_SYSTEM* fileSystem,
-	                            PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize,
-	                            FSP_FSCTL_FILE_INFO* fileInfo) {
+	                     PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize,
+	                     FSP_FSCTL_FILE_INFO* fileInfo) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 
 		const NTSTATUS result = CompatSetFileSizeInternal(fileSystem, fileNode, newSize, setAllocationSize);
@@ -63,7 +63,7 @@ namespace Memfs::Interface {
 	}
 
 	NTSTATUS Rename(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
-	                       PWSTR fileName, PWSTR newFileName, BOOLEAN replaceIfExists) {
+	                PWSTR fileName, PWSTR newFileName, BOOLEAN replaceIfExists) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
 
@@ -84,8 +84,8 @@ namespace Memfs::Interface {
 		const ULONG newFileNameLen = (ULONG)wcslen(newFileName);
 
 		// Check for max path
-		const auto descendants = memfs->EnumerateDescendants(*fileNode, true);
-		for (const FileNode* descendant : descendants) {
+		const auto descendants = memfs->EnumerateDescendants(*fileNode, false);
+		for (const auto& descendant : descendants) {
 			if (MEMFS_MAX_PATH <= descendant->fileName.length() - fileNameLen + newFileNameLen) {
 				return STATUS_OBJECT_NAME_INVALID;
 			}
@@ -96,16 +96,17 @@ namespace Memfs::Interface {
 
 			newFileNode.Reference();
 			memfs->RemoveNode(newFileNode);
-			newFileNode.Dereference();
+			newFileNode.Dereference(true);
 		}
 
 		// Rename descendants
-		for (FileNode* descendant : descendants) {
+		for (const auto& descendant : descendants) {
 			memfs->RemoveNode(*descendant, false);
 
-			descendant->fileName = newFileName + descendant->fileName.substr(fileNameLen);
+			std::wstring oldFileNameDesc = descendant->fileName;
+			descendant->fileName = newFileName + oldFileNameDesc.substr(fileNameLen);
 
-			const auto [result,_] = memfs->InsertNode(std::move(*descendant));
+			const auto [result,_] = memfs->InsertNode(descendant);
 			if (!NT_SUCCESS(result)) {
 				FspDebugLog(__FUNCTION__ ": cannot insert into FileNodeMap; aborting\n");
 				abort();

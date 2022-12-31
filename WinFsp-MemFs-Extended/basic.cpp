@@ -5,7 +5,15 @@
 using namespace Memfs;
 
 FSP_FILE_SYSTEM* MemFs::GetRawFileSystem() const {
-	return this->fileSystem;
+	return this->fileSystem.get();
+}
+
+FileNodeMap& MemFs::GetRawFileMap() {
+	return this->fileMap;
+}
+
+FileReferenceMap& MemFs::GetRawRefMap() {
+	return this->refMap;
 }
 
 std::wstring& MemFs::GetVolumeLabel() {

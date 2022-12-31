@@ -20,7 +20,7 @@ public:
 
 		wantedSize_ = size;
 		size_ = requiredInt64s * sizeof(int64_t);
-		data_ = std::make_unique<int64_t[]>(requiredInt64s);
+		data_ = std::unique_ptr<int64_t[]>(new int64_t[requiredInt64s]);
 	}
 
 	~DynamicStruct() = default;

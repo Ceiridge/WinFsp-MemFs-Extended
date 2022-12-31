@@ -49,7 +49,7 @@ namespace Memfs::Interface {
 		}
 
 		if ((flags & FspCleanupDelete) && !memfs->HasChild(*fileNode)) {
-			for (FileNode* namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
+			for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
 				memfs->RemoveNode(*namedStream);
 			}
 
@@ -73,9 +73,9 @@ namespace Memfs::Interface {
 			return STATUS_SUCCESS;
 
 		// I don't think this makes references
-		for (FileNode* namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
-			if (!CompatAddStreamInfo(namedStream, buffer, length, pBytesTransferred)) {
-				return STATUS_INSUFFICIENT_RESOURCES;
+		for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
+			if (!CompatAddStreamInfo(namedStream.get(), buffer, length, pBytesTransferred)) {
+				return STATUS_SUCCESS; // Without end
 			}
 		}
 

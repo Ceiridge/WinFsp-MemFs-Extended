@@ -14,7 +14,9 @@ namespace Memfs::Interface {
 				result = STATUS_REPARSE;
 			} else {
 				const auto [parentResult, _] = memfs->FindParent(fileName);
-				result = parentResult;
+				if (parentResult != STATUS_SUCCESS) {
+					result = parentResult;
+				}
 			}
 
 			return result;
@@ -35,14 +37,14 @@ namespace Memfs::Interface {
 		}
 
 		if (pSecurityDescriptorSize != nullptr) {
-			if (fileNode->fileSecurity.ByteSize() > *pSecurityDescriptorSize) {
-				*pSecurityDescriptorSize = fileNode->fileSecurity.ByteSize();
+			if (fileNode->fileSecurity.WantedByteSize() > *pSecurityDescriptorSize) {
+				*pSecurityDescriptorSize = fileNode->fileSecurity.WantedByteSize();
 				return STATUS_BUFFER_OVERFLOW;
 			}
 
-			*pSecurityDescriptorSize = fileNode->fileSecurity.ByteSize();
+			*pSecurityDescriptorSize = fileNode->fileSecurity.WantedByteSize();
 			if (securityDescriptor != nullptr) {
-				memcpy_s(securityDescriptor, sizeof(SECURITY_DESCRIPTOR), fileNode->fileSecurity.Struct(), sizeof(SECURITY_DESCRIPTOR));
+				memcpy_s(securityDescriptor, *pSecurityDescriptorSize, fileNode->fileSecurity.Struct(), fileNode->fileSecurity.WantedByteSize());
 			}
 		}
 
@@ -60,14 +62,14 @@ namespace Memfs::Interface {
 			fileNode = mainFileNodeShared.get();
 		}
 
-		if (fileNode->fileSecurity.ByteSize() > *pSecurityDescriptorSize) {
-			*pSecurityDescriptorSize = fileNode->fileSecurity.ByteSize();
+		if (fileNode->fileSecurity.WantedByteSize() > *pSecurityDescriptorSize) {
+			*pSecurityDescriptorSize = fileNode->fileSecurity.WantedByteSize();
 			return STATUS_BUFFER_OVERFLOW;
 		}
 
-		*pSecurityDescriptorSize = fileNode->fileSecurity.ByteSize();
+		*pSecurityDescriptorSize = fileNode->fileSecurity.WantedByteSize();
 		if (securityDescriptor != nullptr) {
-			memcpy_s(securityDescriptor, sizeof(SECURITY_DESCRIPTOR), fileNode->fileSecurity.Struct(), sizeof(SECURITY_DESCRIPTOR));
+			memcpy_s(securityDescriptor, *pSecurityDescriptorSize, fileNode->fileSecurity.Struct(), fileNode->fileSecurity.WantedByteSize());
 		}
 
 		return STATUS_SUCCESS;

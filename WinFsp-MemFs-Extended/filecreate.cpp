@@ -58,7 +58,7 @@ namespace Memfs::Interface {
 
 
 		try {
-			FileNode fileNode = FileNode(fileName);
+			FileNode fileNode(fileName);
 
 			const auto mainNode = memfs->FindMainFromStream(fileName);
 			if (mainNode.has_value()) {
@@ -157,8 +157,7 @@ namespace Memfs::Interface {
 		if (!fileNodeOpt.has_value()) {
 			result = STATUS_OBJECT_NAME_NOT_FOUND;
 			const auto [parentStatus, _] = memfs->FindParent(fileName);
-			result = parentStatus;
-			return result;
+			return parentStatus ? parentStatus : result;
 		}
 		FileNode& fileNode = fileNodeOpt.value();
 
@@ -193,7 +192,7 @@ namespace Memfs::Interface {
 
 		NTSTATUS result;
 
-		for (FileNode* namedStream : memfs->EnumerateNamedStreams(*fileNode, true)) {
+		for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, true)) {
 			const volatile long refCount = namedStream->GetReferenceCount(true);
 			MemoryBarrier(); // Remove this barrier in the future
 			if (2 >= refCount) {

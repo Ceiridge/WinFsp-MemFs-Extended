@@ -14,12 +14,12 @@ namespace Memfs::Interface {
 
 			for (const auto eaEntry : eaMap | std::views::values) {
 				if (!FspFileSystemAddEa((PFILE_FULL_EA_INFORMATION)eaEntry.Struct(), ea, eaLength, pBytesTransferred)) {
-					return STATUS_INSUFFICIENT_RESOURCES;
+					return STATUS_SUCCESS; // Without end
 				}
 			}
 		}
 
-		FspFileSystemAddEa(nullptr, ea, eaLength, pBytesTransferred);
+		FspFileSystemAddEa(nullptr, ea, eaLength, pBytesTransferred); // List end
 		return STATUS_SUCCESS;
 	}
 

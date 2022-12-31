@@ -4,6 +4,7 @@
 #include <winfsp/winfsp.h>
 
 #include <map>
+#include <unordered_map>
 #include <memory>
 #include <optional>
 #include <string>

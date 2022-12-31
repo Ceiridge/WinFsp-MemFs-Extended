@@ -140,7 +140,7 @@ NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 	}
 
 	try {
-		GlobalMemFs = std::make_unique<MemFs>(MemFs(flags | otherFlags, maxFsSize, fileSystemName, volumePrefix, volumeLabel, rootSddl));
+		GlobalMemFs = std::unique_ptr<MemFs>(new MemFs(flags | otherFlags, maxFsSize, fileSystemName, volumePrefix, volumeLabel, rootSddl));
 	} catch (CreateException& _) {
 		LogFail(L"cannot create MEMFS");
 		goto exit;

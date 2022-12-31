@@ -9,7 +9,7 @@
 namespace Memfs {
 	using FileNodeEaMap = std::map<std::string, DynamicStruct<FILE_FULL_EA_INFORMATION>, Utils::EaLess>;
 
-	class FileNode {
+	class FileNode : public std::enable_shared_from_this<FileNode> {
 	public:
 		std::wstring fileName; // Has to be constrained!
 		FSP_FSCTL_FILE_INFO fileInfo{};
@@ -26,7 +26,7 @@ namespace Memfs {
 
 		long GetReferenceCount(const bool withInterlock = true);
 		void Reference();
-		void Dereference();
+		void Dereference(bool toZero = false);
 
 		void CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const;
 

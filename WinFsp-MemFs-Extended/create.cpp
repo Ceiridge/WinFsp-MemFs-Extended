@@ -20,7 +20,6 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	FileNode* rootNode;
 	PSECURITY_DESCRIPTOR rootSecurity;
 	ULONG rootSecuritySize;
-	BOOLEAN inserted;
 
 	if (rootSddl == nullptr) {
 		rootSddl = L"O:BAG:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;WD)";
@@ -29,6 +28,8 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	                                                          &rootSecurity, &rootSecuritySize)) {
 		throw CreateException(FspNtStatusFromWin32(GetLastError()));
 	}
+
+	this->fileMap = FileNodeMap(Utils::FileLess(caseInsensitive));
 
 	// Cannot use initializer list
 	FSP_FSCTL_VOLUME_PARAMS volumeParams{};
@@ -63,12 +64,15 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	         nullptr != fileSystemName ? fileSystemName : L"-MEMEFS");
 
 	std::wstring devicePathMut{devicePath};
-	NTSTATUS status = FspFileSystemCreate(devicePathMut.data(), &volumeParams, &Interface::Interface, &this->fileSystem);
+
+	FSP_FILE_SYSTEM* fileSystemReceiver;
+	NTSTATUS status = FspFileSystemCreate(devicePathMut.data(), &volumeParams, &Interface::Interface, &fileSystemReceiver);
 	if (!NT_SUCCESS(status)) {
 		LocalFree(rootSecurity);
 		throw CreateException(status);
 	}
 
+	this->fileSystem = std::unique_ptr<FSP_FILE_SYSTEM>(fileSystemReceiver);
 	this->fileSystem->UserContext = this;
 
 	if (volumeLabel != nullptr) {
@@ -99,20 +103,19 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 
 MemFs::~MemFs() {
 	this->Destroy();
-	// TODO: This might have a memory leak, because member variables are not deleted, including the SectorManager
 }
 
 void MemFs::Destroy() {
 	if (this->fileSystem) {
-		FspFileSystemDelete(this->fileSystem);
+		FspFileSystemDelete(this->fileSystem.get());
 		this->fileSystem = nullptr;
 	}
 }
 
 NTSTATUS MemFs::Start() const {
-	return FspFileSystemStartDispatcher(this->fileSystem, 0);
+	return FspFileSystemStartDispatcher(this->fileSystem.get(), 0);
 }
 
 void MemFs::Stop() const {
-	FspFileSystemStopDispatcher(this->fileSystem);
+	FspFileSystemStopDispatcher(this->fileSystem.get());
 }

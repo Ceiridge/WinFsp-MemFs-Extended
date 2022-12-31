@@ -31,7 +31,7 @@ namespace Memfs {
 				}
 
 
-				if (memfs->GetSectorManager().ReAllocate(fileNode->GetSectorNode(), newSize)) {
+				if (!memfs->GetSectorManager().ReAllocate(fileNode->GetSectorNode(), newSize)) {
 					return STATUS_INSUFFICIENT_RESOURCES;
 				}
 
@@ -89,7 +89,7 @@ namespace Memfs {
 	}
 
 	BOOLEAN CompatAddDirInfo(FileNode* fileNode, PCWSTR fileName, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
-		DynamicStruct<FSP_FSCTL_DIR_INFO> dirInfoBuf(sizeof(FSP_FSCTL_DIR_INFO) + fileNode->fileName.size() + 1);
+		DynamicStruct<FSP_FSCTL_DIR_INFO> dirInfoBuf(sizeof(FSP_FSCTL_DIR_INFO) + fileNode->fileName.size() * sizeof(std::wstring::value_type) + 1);
 		FSP_FSCTL_DIR_INFO* dirInfo = dirInfoBuf.Struct();
 
 		std::wstring fileNameStr;
@@ -109,7 +109,7 @@ namespace Memfs {
 	}
 
 	BOOLEAN CompatAddStreamInfo(FileNode* fileNode, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
-		DynamicStruct<FSP_FSCTL_STREAM_INFO> streamInfoBuf(sizeof(FSP_FSCTL_STREAM_INFO) + fileNode->fileName.size() + 1);
+		DynamicStruct<FSP_FSCTL_STREAM_INFO> streamInfoBuf(sizeof(FSP_FSCTL_STREAM_INFO) + fileNode->fileName.size() * sizeof(std::wstring::value_type) + 1);
 		FSP_FSCTL_STREAM_INFO* streamInfo = streamInfoBuf.Struct();
 
 		const auto streamNamePos = fileNode->fileName.find_first_of(L':');

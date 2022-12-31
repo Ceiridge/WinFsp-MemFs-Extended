@@ -33,12 +33,12 @@ namespace Memfs::Interface {
 			}
 		}
 
-		const std::wstring_view markerView = marker;
+		const std::wstring_view markerView = marker ? marker : L"";
 		const std::refoptional<const std::wstring_view> markerOpt = (marker == nullptr) ? std::nullopt : std::make_optional(markerView);
 
-		for (FileNode* child : memfs->EnumerateDirChildren(*fileNode, markerOpt)) {
-			if (!CompatAddDirInfo(child, nullptr, buffer, length, pBytesTransferred)) {
-				return STATUS_INSUFFICIENT_RESOURCES;
+		for (const auto& child : memfs->EnumerateDirChildren(*fileNode, markerOpt)) {
+			if (!CompatAddDirInfo(child.get(), nullptr, buffer, length, pBytesTransferred)) {
+				return STATUS_SUCCESS; // Without end
 			}
 		}
 
@@ -58,7 +58,7 @@ namespace Memfs::Interface {
 		}
 
 		const bool needsSlash = 1 < parentLength;
-		std::wstring fileNameStr = std::wstring(fileName) + (needsSlash ? L"\\" : L"") + fileName;
+		std::wstring fileNameStr = parentNode->fileName + (needsSlash ? L"\\" : L"") + fileName;
 
 		const auto fileNodeOpt = memfs->FindFile(fileNameStr);
 		if (!fileNodeOpt.has_value()) {

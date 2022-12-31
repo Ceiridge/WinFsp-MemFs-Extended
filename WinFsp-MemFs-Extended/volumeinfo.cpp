@@ -13,8 +13,8 @@ namespace Memfs::Interface {
 		volumeInfo->FreeSize = availableSize;
 
 		const std::wstring& volumeLabel = memfs->GetVolumeLabel();
-		volumeInfo->VolumeLabelLength = volumeLabel.capacity(); // TODO: This might cause issues
-		memcpy_s(volumeInfo->VolumeLabel, MAX_VOLUME_LABEL_STR_LENGTH * sizeof(WCHAR), volumeLabel.data(), volumeLabel.capacity());
+		volumeInfo->VolumeLabelLength = volumeLabel.size() * sizeof(std::wstring::value_type);
+		memcpy_s(volumeInfo->VolumeLabel, MAX_VOLUME_LABEL_STR_LENGTH * sizeof(WCHAR), volumeLabel.data(), volumeInfo->VolumeLabelLength);
 
 		return STATUS_SUCCESS;
 	}

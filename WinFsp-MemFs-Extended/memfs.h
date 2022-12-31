@@ -22,7 +22,8 @@
 #include "sectors.h"
 
 namespace Memfs {
-	using FileNodeMap = std::map<std::wstring, FileNode, Utils::FileLess>;
+	using FileNodeMap = std::map<std::wstring, std::shared_ptr<FileNode>, Utils::FileLess>;
+	using FileReferenceMap = std::unordered_map<UINT64, std::shared_ptr<FileNode>>;
 
 	class MemFs {
 	public:
@@ -32,7 +33,7 @@ namespace Memfs {
 		MemFs(MemFs&& other) noexcept = default;
 
 		MemFs& operator=(const MemFs& other) = delete;
-		MemFs& operator=(MemFs&& other) noexcept = delete;
+		MemFs& operator=(MemFs&& other) noexcept = default;
 
 		void Destroy();
 
@@ -58,28 +59,33 @@ namespace Memfs {
 		void TouchParent(const FileNode& node);
 		bool HasChild(const FileNode& node);
 
+		std::pair<NTSTATUS, const std::shared_ptr<FileNode>&> InsertNode(const std::shared_ptr<FileNode>& node);
 		std::pair<NTSTATUS, FileNode&> InsertNode(FileNode&& node);
 		void RemoveNode(FileNode& node, const bool reportDeletedSize = true);
 
-		std::vector<FileNode*> EnumerateNamedStreams(const FileNode& node, const bool references);
-		std::vector<FileNode*> EnumerateDescendants(const FileNode& node, const bool references);
-		std::vector<FileNode*> EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker);
+		std::vector<std::shared_ptr<FileNode>> EnumerateNamedStreams(const FileNode& node, const bool references);
+		std::vector<std::shared_ptr<FileNode>> EnumerateDescendants(const FileNode& node, const bool references);
+		std::vector<std::shared_ptr<FileNode>> EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker);
+
+		FileNodeMap& GetRawFileMap();
+		FileReferenceMap& GetRawRefMap();
 
 	private:
-		FSP_FILE_SYSTEM* fileSystem{};
+		std::unique_ptr<FSP_FILE_SYSTEM> fileSystem;
 
 		UINT64 maxFsSize;
-		UINT64 cachedMaxFsSize;
-		UINT64 lastCacheTime;
+		UINT64 cachedMaxFsSize{};
+		UINT64 lastCacheTime{};
 
 		std::wstring volumeLabel{L"MEMEFS"};
 
 		SectorManager sectors;
+		FileReferenceMap refMap;
 		FileNodeMap fileMap;
 
 		// std::unordered_map<MEMFS_FILE_NODE*, UINT64> toBeDeletedFileNodeSizes;
 		// std::mutex toBeDeletedFileNodeMutex;
 	};
 
-	static inline MemFs* MEMFS_SINGLETON;
+	inline MemFs* MEMFS_SINGLETON;
 }
