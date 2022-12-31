@@ -1,10 +1,11 @@
 #pragma once
-#include <string_view>
+
+#include "globalincludes.h"
 
 namespace Memfs::Utils {
-	static int FileNameCompare(const PCWSTR a, int alen, const PCWSTR b, int blen, const BOOLEAN caseInsensitive);
-	static BOOLEAN FileNameHasPrefix(const PCWSTR a, const PCWSTR b, const BOOLEAN caseInsensitive);
-	static int EaNameCompare(const PCSTR a, const PCSTR b);
+	int FileNameCompare(const PCWSTR a, int alen, const PCWSTR b, int blen, const BOOLEAN caseInsensitive);
+	BOOLEAN FileNameHasPrefix(const PCWSTR a, const PCWSTR b, const BOOLEAN caseInsensitive);
+	int EaNameCompare(const PCSTR a, const PCSTR b);
 
 	struct EaLess {
 		using is_transparent = std::true_type;

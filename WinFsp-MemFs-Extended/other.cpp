@@ -4,7 +4,7 @@
 #include "utils.h"
 
 namespace Memfs::Interface {
-	static VOID Cleanup(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, PWSTR fileName, ULONG flags) {
+	VOID Cleanup(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, PWSTR fileName, ULONG flags) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
 
@@ -57,7 +57,7 @@ namespace Memfs::Interface {
 		}
 	}
 
-	static NTSTATUS GetStreamInfo(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS GetStreamInfo(FSP_FILE_SYSTEM* fileSystem,
 	                              PVOID fileNode0, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
@@ -83,7 +83,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS Control(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS Control(FSP_FILE_SYSTEM* fileSystem,
 	                        PVOID fileNode, UINT32 controlCode,
 	                        PVOID inputBuffer, ULONG inputBufferLength,
 	                        PVOID outputBuffer, ULONG outputBufferLength, PULONG pBytesTransferred) {

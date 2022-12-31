@@ -3,14 +3,14 @@
 #include "memfs-interface.h"
 
 namespace Memfs::Interface {
-	static NTSTATUS GetEa(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS GetEa(FSP_FILE_SYSTEM* fileSystem,
 	                      PVOID fileNode0,
 	                      PFILE_FULL_EA_INFORMATION ea, ULONG eaLength, PULONG pBytesTransferred) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 
 		const auto eaMapOpt = fileNode->GetEaMapOpt();
 		if (eaMapOpt.has_value()) {
-			const auto eaMap = eaMapOpt.value();
+			const auto& eaMap = eaMapOpt.value().get();
 
 			for (const auto eaEntry : eaMap | std::views::values) {
 				if (!FspFileSystemAddEa((PFILE_FULL_EA_INFORMATION)eaEntry.Struct(), ea, eaLength, pBytesTransferred)) {
@@ -23,7 +23,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS SetEa(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS SetEa(FSP_FILE_SYSTEM* fileSystem,
 	                      PVOID fileNode0,
 	                      PFILE_FULL_EA_INFORMATION ea, ULONG eaLength,
 	                      FSP_FSCTL_FILE_INFO* fileInfo) {

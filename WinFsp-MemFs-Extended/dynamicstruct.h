@@ -1,6 +1,7 @@
 #pragma once
-#include <memory>
-#include <type_traits>
+
+#include "globalincludes.h"
+
 
 template <typename T>
 class DynamicStruct {

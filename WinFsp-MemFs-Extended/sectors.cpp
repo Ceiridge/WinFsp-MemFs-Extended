@@ -1,4 +1,7 @@
+#include "globalincludes.h"
 #include "sectors.h"
+
+#include "memfs.h"
 
 using namespace Memfs;
 
@@ -157,18 +160,24 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 	return true;
 }
 
+// Not actually used anywhere
+void ForceTemplateFunctionGenerationHelper() {
+	SectorNode& nothing = *static_cast<SectorNode*>(nullptr);
+	SectorManager::ReadWrite<true>(nothing, nullptr, 0, 0);
+	SectorManager::ReadWrite<false>(nothing, nullptr, 0, 0);
+}
+
 SectorNode::~SectorNode() {
-	const SectorManager& sectorManager = MEMFS_SINGLETON->GetSectorManager();
+	SectorManager& sectorManager = MEMFS_SINGLETON->GetSectorManager();
 	sectorManager.Free(*this);
 
 	// memefs: If fully empty, recreate the heap
-	if(sectorManager.IsFullyEmpty()) {
+	/*if (sectorManager.IsFullyEmpty()) {
 		MEMFS_SINGLETON->RecreateSectorManager();
-	}
+	}*/
 }
 
-SectorNode::SectorNode(SectorNode&& other) noexcept : Sectors(std::move(other.Sectors)) {
-}
+SectorNode::SectorNode(SectorNode&& other) noexcept : Sectors(std::move(other.Sectors)) {}
 
 SectorNode& SectorNode::operator=(SectorNode&& other) noexcept {
 	MEMFS_SINGLETON->GetSectorManager().Free(*this);

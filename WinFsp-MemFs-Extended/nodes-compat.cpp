@@ -1,12 +1,12 @@
-#include <cassert>
+#include "globalincludes.h"
 
 #include "exceptions.h"
-#include "memfs-interface.h"
 #include "nodes.h"
 #include "utils.h"
+#include "memfs-interface.h"
 
 namespace Memfs {
-	static NTSTATUS CompatFspFileNodeSetEa(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode, PFILE_FULL_EA_INFORMATION ea) {
+	NTSTATUS CompatFspFileNodeSetEa(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode, PFILE_FULL_EA_INFORMATION ea) {
 		FileNode* node = static_cast<FileNode*>(fileNode);
 
 		try {
@@ -18,7 +18,7 @@ namespace Memfs {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS CompatSetFileSizeInternal(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize) {
+	NTSTATUS CompatSetFileSizeInternal(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize) {
 		MemFs* memfs = Interface::GetMemFs(fileSystem);
 		FileNode* fileNode = Interface::GetFileNode(fileNode0);
 
@@ -63,7 +63,7 @@ namespace Memfs {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS CompatGetReparsePointByName(FSP_FILE_SYSTEM* fileSystem, PVOID context, PWSTR fileName, BOOLEAN isDirectory, PVOID buffer, PSIZE_T pSize) {
+	NTSTATUS CompatGetReparsePointByName(FSP_FILE_SYSTEM* fileSystem, PVOID context, PWSTR fileName, BOOLEAN isDirectory, PVOID buffer, PSIZE_T pSize) {
 		MemFs* memfs = Interface::GetMemFs(fileSystem);
 
 		/* GetReparsePointByName will never receive a named stream */
@@ -88,7 +88,7 @@ namespace Memfs {
 		return STATUS_SUCCESS;
 	}
 
-	static BOOLEAN CompatAddDirInfo(FileNode* fileNode, PCWSTR fileName, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
+	BOOLEAN CompatAddDirInfo(FileNode* fileNode, PCWSTR fileName, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
 		DynamicStruct<FSP_FSCTL_DIR_INFO> dirInfoBuf(sizeof(FSP_FSCTL_DIR_INFO) + fileNode->fileName.size() + 1);
 		FSP_FSCTL_DIR_INFO* dirInfo = dirInfoBuf.Struct();
 
@@ -108,7 +108,7 @@ namespace Memfs {
 		return FspFileSystemAddDirInfo(dirInfo, buffer, length, pBytesTransferred);
 	}
 
-	static BOOLEAN CompatAddStreamInfo(FileNode* fileNode, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
+	BOOLEAN CompatAddStreamInfo(FileNode* fileNode, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
 		DynamicStruct<FSP_FSCTL_STREAM_INFO> streamInfoBuf(sizeof(FSP_FSCTL_STREAM_INFO) + fileNode->fileName.size() + 1);
 		FSP_FSCTL_STREAM_INFO* streamInfo = streamInfoBuf.Struct();
 

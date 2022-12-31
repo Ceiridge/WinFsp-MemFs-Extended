@@ -1,5 +1,6 @@
-#include "memfs.h"
+#include "globalincludes.h"
 #include "utils.h"
+#include "memfs.h"
 
 using namespace Memfs;
 
@@ -7,7 +8,7 @@ bool MemFs::IsCaseInsensitive() const {
 	return this->fileMap.key_comp().CaseInsensitive;
 }
 
-std::optional<FileNode&> MemFs::FindFile(const std::wstring_view& fileName) {
+std::refoptional<FileNode> MemFs::FindFile(const std::wstring_view& fileName) {
 	const auto iter = this->fileMap.find(fileName);
 	if (iter == this->fileMap.end()) {
 		return {};
@@ -16,7 +17,7 @@ std::optional<FileNode&> MemFs::FindFile(const std::wstring_view& fileName) {
 	return iter->second;
 }
 
-std::optional<FileNode&> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
+std::refoptional<FileNode> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
 	const auto colonPos = std::ranges::find(fileName, L':');
 	std::wstring mainName;
 
@@ -34,7 +35,7 @@ std::optional<FileNode&> MemFs::FindMainFromStream(const std::wstring_view& file
 	return iter->second;
 }
 
-std::pair<NTSTATUS, std::optional<FileNode&>> MemFs::FindParent(const std::wstring_view& fileName) {
+std::pair<NTSTATUS, std::refoptional<FileNode>> MemFs::FindParent(const std::wstring_view& fileName) {
 	const auto parentPath = Utils::PathSuffix(fileName).RemainPrefix;
 
 	const auto iter = this->fileMap.find(parentPath);
@@ -139,7 +140,7 @@ std::vector<FileNode*> MemFs::EnumerateDescendants(const FileNode& node, const b
 	return descendants;
 }
 
-std::vector<FileNode*> MemFs::EnumerateDirChildren(const FileNode& node, const std::optional<const std::wstring_view&> marker) {
+std::vector<FileNode*> MemFs::EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker) {
 	std::vector<FileNode*> children;
 	FileNodeMap::iterator iter;
 

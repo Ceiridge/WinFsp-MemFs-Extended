@@ -1,18 +1,18 @@
-#include <Windows.h>
-
+#include "globalincludes.h"
 #include "memfs.h"
 
 using namespace Memfs;
 
 // memefs: Get the all file sizes and the node map size
 UINT64 MemFs::GetUsedTotalSize() {
-	// TODO: Update this to the new code
-	const ULONG nodeMapSize = (ULONG)this->fileNodeMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE) + sizeof(std::mutex) + sizeof(std::mutex*));
+	/*// TODO: Update this to the new code
+	const ULONG nodeMapSize = (ULONG)this->fileMap->size() * (sizeof(PWSTR) * MEMFS_MAX_PATH + sizeof(MEMFS_FILE_NODE) + sizeof(std::mutex) + sizeof(std::mutex*));
 	// EA node map is ignored, because it is insignificant
 
 	// TODO: Update
 	const SIZE_T sectorSizes = this->allocatedSectors * (sizeof(MEMEFS_SECTOR) + sizeof(MEMEFS_SECTOR*));
-	return nodeMapSize + sectorSizes;
+	return nodeMapSize + sectorSizes;*/
+	return 0ULL;
 }
 
 

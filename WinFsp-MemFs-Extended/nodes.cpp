@@ -1,6 +1,7 @@
-#include "nodes.h"
+#include "globalincludes.h"
 #include "exceptions.h"
 #include "utils.h"
+#include "nodes.h"
 
 using namespace Memfs;
 
@@ -80,7 +81,7 @@ FileNodeEaMap& FileNode::GetEaMap() {
 	return this->eaMap.value();
 }
 
-std::optional<FileNodeEaMap&> FileNode::GetEaMapOpt() {
+std::refoptional<FileNodeEaMap> FileNode::GetEaMapOpt() {
 	if (!this->IsMainNode()) {
 		return this->mainFileNode.lock()->GetEaMapOpt();
 	}
@@ -138,8 +139,8 @@ bool FileNode::NeedsEa() {
 		return false;
 	}
 
-	for (const auto& p : this->eaMap) {
-		if (0 != (p.second->Flags & FILE_NEED_EA)) {
+	for (const auto& p : this->eaMap.value()) {
+		if (p.second.HoldsStruct() && 0 != (p.second.Struct()->Flags & FILE_NEED_EA)) {
 			return true;
 		}
 	}

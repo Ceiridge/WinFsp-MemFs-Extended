@@ -1,7 +1,7 @@
 #include "memfs-interface.h"
 
 namespace Memfs::Interface {
-	static NTSTATUS ResolveReparsePoints(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS ResolveReparsePoints(FSP_FILE_SYSTEM* fileSystem,
 	                                     PWSTR fileName, UINT32 reparsePointIndex, BOOLEAN resolveLastPathComponent,
 	                                     PIO_STATUS_BLOCK pIoStatus, PVOID buffer, PSIZE_T pSize) {
 		return FspFileSystemResolveReparsePoints(fileSystem, CompatGetReparsePointByName, nullptr,
@@ -9,7 +9,7 @@ namespace Memfs::Interface {
 		                                         pIoStatus, buffer, pSize);
 	}
 
-	static NTSTATUS GetReparsePoint(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS GetReparsePoint(FSP_FILE_SYSTEM* fileSystem,
 	                                PVOID fileNode0,
 	                                PWSTR fileName, PVOID buffer, PSIZE_T pSize) {
 		FileNode* fileNode = GetFileNode(fileNode0);
@@ -34,7 +34,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS SetReparsePoint(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS SetReparsePoint(FSP_FILE_SYSTEM* fileSystem,
 	                                PVOID fileNode0,
 	                                PWSTR fileName, PVOID buffer, SIZE_T size) {
 		MemFs* memfs = GetMemFs(fileSystem);
@@ -75,7 +75,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS DeleteReparsePoint(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS DeleteReparsePoint(FSP_FILE_SYSTEM* fileSystem,
 	                                   PVOID fileNode0,
 	                                   PWSTR fileName, PVOID buffer, SIZE_T size) {
 		MemFs* memfs = GetMemFs(fileSystem);

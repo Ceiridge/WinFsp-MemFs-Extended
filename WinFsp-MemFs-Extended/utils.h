@@ -1,9 +1,9 @@
 #pragma once
-#include <cstdint>
-#include <string_view>
+
+#include "globalincludes.h"
 
 namespace Memfs::Utils {
-	static inline uint64_t GetSystemTime();
+	uint64_t GetSystemTime();
 
 	struct SuffixView {
 		std::wstring_view RemainPrefix, Suffix;
@@ -15,5 +15,5 @@ namespace Memfs::Utils {
 	 * \param root Mostly backslash
 	 * \return Prefix remainder and suffix
 	 */
-	static SuffixView PathSuffix(const std::wstring_view& path, const std::wstring_view& root = DEFAULT_ROOT);
+	SuffixView PathSuffix(const std::wstring_view& path, const std::wstring_view& root = DEFAULT_ROOT);
 }

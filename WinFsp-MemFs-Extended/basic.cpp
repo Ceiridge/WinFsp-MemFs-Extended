@@ -1,3 +1,4 @@
+#include "globalincludes.h"
 #include "memfs.h"
 #include "memfs-interface.h"
 

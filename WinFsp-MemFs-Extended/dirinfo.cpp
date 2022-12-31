@@ -1,12 +1,10 @@
-#include <cassert>
-
 #include "memfs-interface.h"
 #include "utils.h"
 
 namespace Memfs::Interface {
-	static NTSTATUS ReadDirectory(FSP_FILE_SYSTEM* fileSystem,
-	                              PVOID fileNode0, PWSTR pattern, PWSTR marker,
-	                              PVOID buffer, ULONG length, PULONG pBytesTransferred) {
+	NTSTATUS ReadDirectory(FSP_FILE_SYSTEM* fileSystem,
+		PVOID fileNode0, PWSTR pattern, PWSTR marker,
+		PVOID buffer, ULONG length, PULONG pBytesTransferred) {
 		assert(nullptr == pattern);
 
 		MemFs* memfs = GetMemFs(fileSystem);
@@ -35,7 +33,9 @@ namespace Memfs::Interface {
 			}
 		}
 
-		const std::optional<const std::wstring_view&> markerOpt = (marker == nullptr) ? std::nullopt : std::make_optional(marker);
+		const std::wstring_view markerView = marker;
+		const std::refoptional<const std::wstring_view> markerOpt = (marker == nullptr) ? std::nullopt : std::make_optional(markerView);
+
 		for (FileNode* child : memfs->EnumerateDirChildren(*fileNode, markerOpt)) {
 			if (!CompatAddDirInfo(child, nullptr, buffer, length, pBytesTransferred)) {
 				return STATUS_INSUFFICIENT_RESOURCES;
@@ -46,8 +46,8 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS GetDirInfoByName(FSP_FILE_SYSTEM* fileSystem,
-	                                 PVOID parentNode0, PWSTR fileName, FSP_FSCTL_DIR_INFO* dirInfo) {
+	NTSTATUS GetDirInfoByName(FSP_FILE_SYSTEM* fileSystem,
+		PVOID parentNode0, PWSTR fileName, FSP_FSCTL_DIR_INFO* dirInfo) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* parentNode = GetFileNode(parentNode0);
 

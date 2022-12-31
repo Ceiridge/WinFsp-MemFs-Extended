@@ -21,9 +21,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="memfs.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -81,6 +78,9 @@
     <ClCompile Include="ea.cpp">
       <Filter>Quelldateien\interface</Filter>
     </ClCompile>
+    <ClCompile Include="dirinfo.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="memfs.h">
@@ -107,10 +107,8 @@
     <ClInclude Include="dynamicstruct.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="dirinfo.cpp">
-      <Filter>Quelldateien\interface</Filter>
-    </None>
+    <ClInclude Include="globalincludes.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

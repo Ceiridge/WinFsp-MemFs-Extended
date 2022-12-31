@@ -1,5 +1,4 @@
-#include <Windows.h>
-
+#include "globalincludes.h"
 #include "utils.h"
 
 namespace Memfs::Utils {

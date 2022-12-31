@@ -1,7 +1,6 @@
 #pragma once
 
-#include <exception>
-#include <winfsp/winfsp.h>
+#include "globalincludes.h"
 
 namespace Memfs {
 	class CreateException final : public std::exception {

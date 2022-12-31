@@ -1,10 +1,6 @@
 ﻿#pragma once
 
-#include <map>
-#include <memory>
-#include <optional>
-#include <winfsp/winfsp.h>
-#include <string>
+#include "globalincludes.h"
 
 #include "sectors.h"
 #include "comparisons.h"
@@ -39,7 +35,7 @@ namespace Memfs {
 		void SetMainNode(std::weak_ptr<FileNode> mainNode);
 
 		FileNodeEaMap& GetEaMap();
-		std::optional<FileNodeEaMap&> GetEaMapOpt();
+		std::refoptional<FileNodeEaMap> GetEaMapOpt();
 		void SetEa(PFILE_FULL_EA_INFORMATION ea);
 		bool NeedsEa();
 		void DeleteEaMap();
@@ -57,9 +53,9 @@ namespace Memfs {
 		std::optional<FileNodeEaMap> eaMap;
 	};
 
-	static NTSTATUS CompatFspFileNodeSetEa(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode, PFILE_FULL_EA_INFORMATION ea);
-	static NTSTATUS CompatSetFileSizeInternal(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize);
-	static NTSTATUS CompatGetReparsePointByName(FSP_FILE_SYSTEM* fileSystem, PVOID context, PWSTR fileName, BOOLEAN isDirectory, PVOID buffer, PSIZE_T pSize);
-	static BOOLEAN CompatAddDirInfo(FileNode* fileNode, PCWSTR fileName, PVOID buffer, ULONG length, PULONG pBytesTransferred);
-	static BOOLEAN CompatAddStreamInfo(FileNode* fileNode, PVOID buffer, ULONG length, PULONG pBytesTransferred);
+	NTSTATUS CompatFspFileNodeSetEa(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode, PFILE_FULL_EA_INFORMATION ea);
+	NTSTATUS CompatSetFileSizeInternal(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize);
+	NTSTATUS CompatGetReparsePointByName(FSP_FILE_SYSTEM* fileSystem, PVOID context, PWSTR fileName, BOOLEAN isDirectory, PVOID buffer, PSIZE_T pSize);
+	BOOLEAN CompatAddDirInfo(FileNode* fileNode, PCWSTR fileName, PVOID buffer, ULONG length, PULONG pBytesTransferred);
+	BOOLEAN CompatAddStreamInfo(FileNode* fileNode, PVOID buffer, ULONG length, PULONG pBytesTransferred);
 }

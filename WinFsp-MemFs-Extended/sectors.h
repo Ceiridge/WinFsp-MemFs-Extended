@@ -1,13 +1,8 @@
 #pragma once
 
-#include <mutex>
-#include <vector>
-
-#include "memfs.h"
+#include "globalincludes.h"
 
 namespace Memfs {
-	static constexpr size_t FULL_SECTOR_SIZE = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
-
 	// Make sure that this struct is never padded, no matter what sector size is used
 #pragma pack(push, memefsNoPadding, 1)
 	struct Sector {

@@ -16,26 +16,12 @@
 
 #pragma once
 
-#include <map>
-#include <winfsp/winfsp.h>
+#include "globalincludes.h"
 
 #include "nodes.h"
 #include "sectors.h"
 
 namespace Memfs {
-	static constexpr int MEMFS_MAX_PATH = 32766;
-	static constexpr UINT64 MEMFS_SECTOR_SIZE = 512;
-	static constexpr UINT64 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
-
-	enum {
-		MemfsDisk = 0x00000000,
-		MemfsNet = 0x00000001,
-		MemfsDeviceMask = 0x0000000f,
-		MemfsCaseInsensitive = 0x80000000,
-		MemfsFlushAndPurgeOnCleanup = 0x40000000,
-		MemfsLegacyUnlinkRename = 0x20000000,
-	};
-
 	using FileNodeMap = std::map<std::wstring, FileNode, Utils::FileLess>;
 
 	class MemFs {
@@ -43,7 +29,7 @@ namespace Memfs {
 		MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const wchar_t* volumePrefix, const wchar_t* volumeLabel, const wchar_t* rootSddl);
 		~MemFs();
 		explicit MemFs(const MemFs& other) = delete;
-		MemFs(MemFs&& other) noexcept = delete;
+		MemFs(MemFs&& other) noexcept = default;
 
 		MemFs& operator=(const MemFs& other) = delete;
 		MemFs& operator=(MemFs&& other) noexcept = delete;
@@ -66,9 +52,9 @@ namespace Memfs {
 		void RecreateSectorManager();
 
 		[[nodiscard]] bool IsCaseInsensitive() const;
-		std::optional<FileNode&> FindFile(const std::wstring_view& fileName);
-		std::optional<FileNode&> FindMainFromStream(const std::wstring_view& fileName);
-		std::pair<NTSTATUS, std::optional<FileNode&>> FindParent(const std::wstring_view& fileName);
+		std::refoptional<FileNode> FindFile(const std::wstring_view& fileName);
+		std::refoptional<FileNode> FindMainFromStream(const std::wstring_view& fileName);
+		std::pair<NTSTATUS, std::refoptional<FileNode>> FindParent(const std::wstring_view& fileName);
 		void TouchParent(const FileNode& node);
 		bool HasChild(const FileNode& node);
 
@@ -77,7 +63,7 @@ namespace Memfs {
 
 		std::vector<FileNode*> EnumerateNamedStreams(const FileNode& node, const bool references);
 		std::vector<FileNode*> EnumerateDescendants(const FileNode& node, const bool references);
-		std::vector<FileNode*> EnumerateDirChildren(const FileNode& node, const std::optional<const std::wstring_view&> marker);
+		std::vector<FileNode*> EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker);
 
 	private:
 		FSP_FILE_SYSTEM* fileSystem{};

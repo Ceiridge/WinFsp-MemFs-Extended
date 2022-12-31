@@ -1,7 +1,7 @@
 #include "memfs-interface.h"
 
 namespace Memfs::Interface {
-	static NTSTATUS Read(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, PVOID buffer, UINT64 offset, ULONG length, PULONG pBytesTransferred) {
+	NTSTATUS Read(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, PVOID buffer, UINT64 offset, ULONG length, PULONG pBytesTransferred) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
 
@@ -23,7 +23,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS Write(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS Write(FSP_FILE_SYSTEM* fileSystem,
 	                      PVOID fileNode0, PVOID buffer, UINT64 offset, ULONG length,
 	                      BOOLEAN writeToEndOfFile, BOOLEAN constrainedIo,
 	                      PULONG pBytesTransferred, FSP_FSCTL_FILE_INFO* fileInfo) {

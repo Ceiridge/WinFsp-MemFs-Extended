@@ -1,7 +1,7 @@
 #include "memfs-interface.h"
 
 namespace Memfs::Interface {
-	static NTSTATUS GetVolumeInfo(FSP_FILE_SYSTEM* fileSystem, FSP_FSCTL_VOLUME_INFO* volumeInfo) {
+	NTSTATUS GetVolumeInfo(FSP_FILE_SYSTEM* fileSystem, FSP_FSCTL_VOLUME_INFO* volumeInfo) {
 		MemFs* memfs = GetMemFs(fileSystem);
 
 		// TODO: Fix toBeDeleted stuff
@@ -19,7 +19,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS SetVolumeLabel(FSP_FILE_SYSTEM* fileSystem, PWSTR volumeLabel, FSP_FSCTL_VOLUME_INFO* volumeInfo) {
+	NTSTATUS SetVolumeLabel(FSP_FILE_SYSTEM* fileSystem, PWSTR volumeLabel, FSP_FSCTL_VOLUME_INFO* volumeInfo) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		memfs->SetVolumeLabel(volumeLabel);
 

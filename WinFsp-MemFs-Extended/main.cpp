@@ -14,11 +14,11 @@
   * associated repository.
   */
 
-#include <string>
-#include <winfsp/winfsp.h>
 
+#include "globalincludes.h"
 #include "exceptions.h"
 #include "memfs.h"
+
 using namespace Memfs;
 
 static const std::wstring PROGNAME{L"memefs"};
@@ -67,6 +67,7 @@ NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 	HANDLE debugLogHandle{INVALID_HANDLE_VALUE};
 
 	NTSTATUS result{-1};
+	MemFs* memfs{};
 
 	for (argp = argv + 1, arge = argv + argc; arge > argp; argp++) {
 		if (L'-' != argp[0][0])
@@ -145,7 +146,7 @@ NTSTATUS SvcStart(FSP_SERVICE* service, ULONG argc, PWSTR* argv) {
 		goto exit;
 	}
 
-	MemFs* memfs = GlobalMemFs.get();
+	memfs = GlobalMemFs.get();
 
 	FSP_FILE_SYSTEM* rawFileSystem = memfs->GetRawFileSystem();
 	FspFileSystemSetDebugLog(rawFileSystem, debugFlags);

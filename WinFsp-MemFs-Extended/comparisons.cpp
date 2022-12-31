@@ -1,9 +1,8 @@
-#include <Windows.h>
-
+#include "globalincludes.h"
 #include "comparisons.h"
 
 namespace Memfs::Utils {
-	static int FileNameCompare(const PCWSTR a, int alen, const PCWSTR b, int blen, const BOOLEAN caseInsensitive) {
+	int FileNameCompare(const PCWSTR a, int alen, const PCWSTR b, int blen, const BOOLEAN caseInsensitive) {
 		PCWSTR p, endp, partp, q, endq, partq;
 		WCHAR c, d;
 		int plen, qlen, len, res;
@@ -60,7 +59,7 @@ namespace Memfs::Utils {
 		return -(endp <= p) + (endq <= q);
 	}
 
-	static BOOLEAN FileNameHasPrefix(const PCWSTR a, const PCWSTR b, const BOOLEAN caseInsensitive) {
+	BOOLEAN FileNameHasPrefix(const PCWSTR a, const PCWSTR b, const BOOLEAN caseInsensitive) {
 		int alen = (int)wcslen(a);
 		int blen = (int)wcslen(b);
 
@@ -69,7 +68,7 @@ namespace Memfs::Utils {
 			(L'\\' == a[blen] || L':' == a[blen]));
 	}
 
-	static int EaNameCompare(const PCSTR a, const PCSTR b) {
+	int EaNameCompare(const PCSTR a, const PCSTR b) {
 		/* EA names are always case-insensitive in MEMFS (to be inline with NTFS) */
 
 		int res;

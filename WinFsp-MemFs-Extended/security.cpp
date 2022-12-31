@@ -1,7 +1,7 @@
 #include "memfs-interface.h"
 
 namespace Memfs::Interface {
-	static NTSTATUS GetSecurityByName(FSP_FILE_SYSTEM* fileSystem, PWSTR fileName, PUINT32 pFileAttributes, PSECURITY_DESCRIPTOR securityDescriptor, SIZE_T* pSecurityDescriptorSize) {
+	NTSTATUS GetSecurityByName(FSP_FILE_SYSTEM* fileSystem, PWSTR fileName, PUINT32 pFileAttributes, PSECURITY_DESCRIPTOR securityDescriptor, SIZE_T* pSecurityDescriptorSize) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		NTSTATUS result;
 
@@ -19,7 +19,7 @@ namespace Memfs::Interface {
 
 			return result;
 		}
-		FileNode* fileNode = &fileNodeOpt.value();
+		FileNode* fileNode = &fileNodeOpt.value().get();
 		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		UINT32 fileAttributesMask = ~(UINT32)0;
@@ -50,7 +50,7 @@ namespace Memfs::Interface {
 	}
 
 	// This code is slightly duplicated :)
-	static NTSTATUS GetSecurity(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
+	NTSTATUS GetSecurity(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
 	                            PSECURITY_DESCRIPTOR securityDescriptor, SIZE_T* pSecurityDescriptorSize) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 		std::shared_ptr<FileNode> mainFileNodeShared;
@@ -73,7 +73,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS SetSecurity(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
+	NTSTATUS SetSecurity(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
 	                            SECURITY_INFORMATION securityInformation, PSECURITY_DESCRIPTOR modificationDescriptor) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 		std::shared_ptr<FileNode> mainFileNodeShared;

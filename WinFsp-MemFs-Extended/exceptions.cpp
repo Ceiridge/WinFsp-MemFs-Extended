@@ -1,6 +1,5 @@
+#include "globalincludes.h"
 #include "exceptions.h"
-
-#include <string>
 
 namespace Memfs {
 	CreateException::CreateException(const NTSTATUS status) : status(status) {

@@ -22,13 +22,13 @@
     <ClCompile Include="basic.cpp" />
     <ClCompile Include="comparisons.cpp" />
     <ClCompile Include="create.cpp" />
+    <ClCompile Include="dirinfo.cpp" />
     <ClCompile Include="ea.cpp" />
     <ClCompile Include="exceptions.cpp" />
     <ClCompile Include="fileinfo.cpp" />
     <ClCompile Include="filemap.cpp" />
     <ClCompile Include="io.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="memfs.cpp" />
     <ClCompile Include="nodes-compat.cpp" />
     <ClCompile Include="nodes.cpp" />
     <ClCompile Include="filecreate.cpp" />
@@ -44,14 +44,12 @@
     <ClInclude Include="comparisons.h" />
     <ClInclude Include="dynamicstruct.h" />
     <ClInclude Include="exceptions.h" />
+    <ClInclude Include="globalincludes.h" />
     <ClInclude Include="memfs-interface.h" />
     <ClInclude Include="nodes.h" />
     <ClInclude Include="sectors.h" />
     <ClInclude Include="memfs.h" />
     <ClInclude Include="utils.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="dirinfo.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

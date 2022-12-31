@@ -1,15 +1,13 @@
-#include <cassert>
-
 #include "memfs-interface.h"
 
 namespace Memfs::Interface {
-	static NTSTATUS GetFileInfo(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, FSP_FSCTL_FILE_INFO* fileInfo) {
+	NTSTATUS GetFileInfo(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, FSP_FSCTL_FILE_INFO* fileInfo) {
 		const FileNode* fileNode = GetFileNode(fileNode0);
 		fileNode->CopyFileInfo(fileInfo);
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS SetBasicInfo(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS SetBasicInfo(FSP_FILE_SYSTEM* fileSystem,
 	                             PVOID fileNode0, UINT32 fileAttributes,
 	                             UINT64 creationTime, UINT64 lastAccessTime, UINT64 lastWriteTime, UINT64 changeTime, FSP_FSCTL_FILE_INFO* fileInfo) {
 		FileNode* fileNode = GetFileNode(fileNode0);
@@ -40,7 +38,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS SetFileSize(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS SetFileSize(FSP_FILE_SYSTEM* fileSystem,
 	                            PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize,
 	                            FSP_FSCTL_FILE_INFO* fileInfo) {
 		FileNode* fileNode = GetFileNode(fileNode0);
@@ -53,7 +51,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS CanDelete(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, PWSTR fileName) {
+	NTSTATUS CanDelete(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, PWSTR fileName) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		const FileNode* fileNode = GetFileNode(fileNode0);
 
@@ -64,13 +62,13 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS Rename(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
+	NTSTATUS Rename(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
 	                       PWSTR fileName, PWSTR newFileName, BOOLEAN replaceIfExists) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
 
 		const auto newFileNodeOpt = memfs->FindFile(newFileName);
-		if (newFileNodeOpt.has_value() && fileNode != &newFileNodeOpt.value()) {
+		if (newFileNodeOpt.has_value() && fileNode != &newFileNodeOpt.value().get()) {
 			const FileNode& newFileNode = newFileNodeOpt.value();
 			if (!replaceIfExists) {
 				return STATUS_OBJECT_NAME_COLLISION;

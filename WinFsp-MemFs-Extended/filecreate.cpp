@@ -5,7 +5,7 @@
 #include "utils.h"
 
 namespace Memfs::Interface {
-	static NTSTATUS Create(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS Create(FSP_FILE_SYSTEM* fileSystem,
 	                       PWSTR fileName0, UINT32 createOptions, UINT32 grantedAccess,
 	                       UINT32 fileAttributes, PSECURITY_DESCRIPTOR securityDescriptor, UINT64 allocationSize,
 	                       PVOID extraBuffer, ULONG extraLength, BOOLEAN extraBufferIsReparsePoint,
@@ -63,7 +63,7 @@ namespace Memfs::Interface {
 			const auto mainNode = memfs->FindMainFromStream(fileName);
 			if (mainNode.has_value()) {
 				// TODO: This might not work and can cause dangling pointers
-				fileNode.SetMainNode(std::shared_ptr<FileNode>(&mainNode.value()));
+				fileNode.SetMainNode(std::shared_ptr<FileNode>(&mainNode.value().get()));
 			}
 
 			fileNode.fileInfo.FileAttributes = (fileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? fileAttributes : fileAttributes | FILE_ATTRIBUTE_ARCHIVE;
@@ -143,7 +143,7 @@ namespace Memfs::Interface {
 		}
 	}
 
-	static NTSTATUS Open(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS Open(FSP_FILE_SYSTEM* fileSystem,
 	                     PWSTR fileName, UINT32 createOptions, UINT32 grantedAccess,
 	                     PVOID* pFileNode, FSP_FSCTL_FILE_INFO* fileInfo) {
 		MemFs* memfs = GetMemFs(fileSystem);
@@ -185,7 +185,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static NTSTATUS Overwrite(FSP_FILE_SYSTEM* fileSystem,
+	NTSTATUS Overwrite(FSP_FILE_SYSTEM* fileSystem,
 	                          PVOID fileNode0, UINT32 fileAttributes, BOOLEAN replaceFileAttributes, UINT64 allocationSize,
 	                          PFILE_FULL_EA_INFORMATION ea, ULONG eaLength, FSP_FSCTL_FILE_INFO* fileInfo) {
 		MemFs* memfs = GetMemFs(fileSystem);
@@ -229,7 +229,7 @@ namespace Memfs::Interface {
 		return STATUS_SUCCESS;
 	}
 
-	static VOID Close(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0) {
+	VOID Close(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 		fileNode->Dereference();
 	}

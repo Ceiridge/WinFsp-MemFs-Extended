@@ -1,9 +1,7 @@
-#include <Windows.h>
-#include <sddl.h>
-
-#include "memfs.h"
+#include "globalincludes.h"
 #include "exceptions.h"
 #include "utils.h"
+#include "memfs.h"
 #include "memfs-interface.h"
 
 using namespace Memfs;
@@ -19,7 +17,7 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 
 	PCWSTR devicePath = MemfsNet == (flags & MemfsDeviceMask) ? L"" FSP_FSCTL_NET_DEVICE_NAME : L"" FSP_FSCTL_DISK_DEVICE_NAME;
 
-	MEMFS_FILE_NODE* rootNode;
+	FileNode* rootNode;
 	PSECURITY_DESCRIPTOR rootSecurity;
 	ULONG rootSecuritySize;
 	BOOLEAN inserted;
@@ -32,36 +30,30 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 		throw CreateException(FspNtStatusFromWin32(GetLastError()));
 	}
 
-	NTSTATUS status = MemfsFileNodeMapCreate(caseInsensitive, &Memfs->FileNodeMap);
-	if (!NT_SUCCESS(status)) {
-		LocalFree(rootSecurity);
-		throw CreateException(status);
-	}
-
-	FSP_FSCTL_VOLUME_PARAMS volumeParams{
-		.Version = sizeof(FSP_FSCTL_VOLUME_PARAMS),
-		.SectorSize = MEMFS_SECTOR_SIZE,
-		.SectorsPerAllocationUnit = MEMFS_SECTORS_PER_ALLOCATION_UNIT,
-		.VolumeCreationTime = Utils::GetSystemTime(),
-		.VolumeSerialNumber = static_cast<UINT32>(Utils::GetSystemTime() / (1010000ULL * 1000ULL)),
-		.FileInfoTimeout = 0,
-		.CaseSensitiveSearch = !caseInsensitive,
-		.CasePreservedNames = true,
-		.UnicodeOnDisk = true,
-		.PersistentAcls = true,
-		.ReparsePoints = true,
-		.ReparsePointsAccessCheck = false,
-		.NamedStreams = true,
-		.PostCleanupWhenModifiedOnly = true,
-		.PassQueryDirectoryFileName = true,
-		.FlushAndPurgeOnCleanup = flushAndPurgeOnCleanup,
-		.DeviceControl = 1,
-		.ExtendedAttributes = true,
-		.WslFeatures = true,
-		.AllowOpenInKernelMode = true,
-		.RejectIrpPriorToTransact0 = true,
-		.SupportsPosixUnlinkRename = supportsPosixUnlinkRename
-	};
+	// Cannot use initializer list
+	FSP_FSCTL_VOLUME_PARAMS volumeParams{};
+	volumeParams.Version = sizeof(FSP_FSCTL_VOLUME_PARAMS);
+	volumeParams.SectorSize = MEMFS_SECTOR_SIZE;
+	volumeParams.SectorsPerAllocationUnit = MEMFS_SECTORS_PER_ALLOCATION_UNIT;
+	volumeParams.VolumeCreationTime = Utils::GetSystemTime();
+	volumeParams.VolumeSerialNumber = static_cast<UINT32>(Utils::GetSystemTime() / (1010000ULL * 1000ULL));
+	volumeParams.FileInfoTimeout = 0;
+	volumeParams.CaseSensitiveSearch = !caseInsensitive;
+	volumeParams.CasePreservedNames = true;
+	volumeParams.UnicodeOnDisk = true;
+	volumeParams.PersistentAcls = true;
+	volumeParams.ReparsePoints = true;
+	volumeParams.ReparsePointsAccessCheck = false;
+	volumeParams.NamedStreams = true;
+	volumeParams.PostCleanupWhenModifiedOnly = true;
+	volumeParams.PassQueryDirectoryFileName = true;
+	volumeParams.ExtendedAttributes = true;
+	volumeParams.FlushAndPurgeOnCleanup = flushAndPurgeOnCleanup;
+	volumeParams.DeviceControl = 1;
+	volumeParams.WslFeatures = true;
+	volumeParams.AllowOpenInKernelMode = true;
+	volumeParams.RejectIrpPriorToTransact0 = true;
+	volumeParams.SupportsPosixUnlinkRename = supportsPosixUnlinkRename;
 
 	if (volumePrefix != nullptr) {
 		wcscpy_s(volumeParams.Prefix, sizeof volumeParams.Prefix / sizeof(WCHAR), volumePrefix);
@@ -71,9 +63,8 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	         nullptr != fileSystemName ? fileSystemName : L"-MEMEFS");
 
 	std::wstring devicePathMut{devicePath};
-	status = FspFileSystemCreate(devicePathMut.data(), &volumeParams, &Interface::Interface, &this->fileSystem);
+	NTSTATUS status = FspFileSystemCreate(devicePathMut.data(), &volumeParams, &Interface::Interface, &this->fileSystem);
 	if (!NT_SUCCESS(status)) {
-		MemfsFileNodeMapDelete(Memfs->FileNodeMap);
 		LocalFree(rootSecurity);
 		throw CreateException(status);
 	}
@@ -86,28 +77,17 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 
 	// Create root directory.
 
-	status = MemfsFileNodeCreate(L"\\", &rootNode);
+	FileNode rootNodeVal(L"\\");
+	rootNode = &rootNodeVal;
+
+	rootNode->fileInfo.FileAttributes = FILE_ATTRIBUTE_DIRECTORY;
+	rootNode->fileSecurity = DynamicStruct<SECURITY_DESCRIPTOR>(rootSecuritySize);
+
+	memcpy_s(rootNode->fileSecurity.Struct(), rootNode->fileSecurity.ByteSize(), rootSecurity, rootSecuritySize);
+
+	const auto [insertStatus, _] = this->InsertNode(std::move(rootNodeVal));
+	status = insertStatus;
 	if (!NT_SUCCESS(status)) {
-		this->Destroy();
-		LocalFree(rootSecurity);
-		throw CreateException(status);
-	}
-
-	rootNode->FileInfo.FileAttributes = FILE_ATTRIBUTE_DIRECTORY;
-
-	rootNode->FileSecurity = malloc(rootSecuritySize);
-	if (rootNode->FileSecurity == nullptr) {
-		MemfsFileNodeDelete(rootNode);
-		this->Destroy();
-		LocalFree(rootSecurity);
-		throw CreateException(STATUS_INSUFFICIENT_RESOURCES);
-	}
-	rootNode->FileSecuritySize = rootSecuritySize;
-	memcpy(rootNode->FileSecurity, rootSecurity, rootSecuritySize);
-
-	status = MemfsFileNodeMapInsert(Memfs->FileNodeMap, rootNode, &inserted);
-	if (!NT_SUCCESS(status)) {
-		MemfsFileNodeDelete(rootNode);
 		this->Destroy();
 		LocalFree(rootSecurity);
 		throw CreateException(status);
