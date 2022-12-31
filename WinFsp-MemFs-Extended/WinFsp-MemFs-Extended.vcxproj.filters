@@ -102,4 +102,9 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="dirinfo.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </None>
+  </ItemGroup>
 </Project>

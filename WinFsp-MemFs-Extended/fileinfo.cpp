@@ -82,8 +82,8 @@ namespace Memfs::Interface {
 		}
 
 		// Old length
-		ULONG fileNameLen = (ULONG)fileNode->fileName.length();
-		ULONG newFileNameLen = (ULONG)wcslen(newFileName);
+		const ULONG fileNameLen = (ULONG)fileNode->fileName.length();
+		const ULONG newFileNameLen = (ULONG)wcslen(newFileName);
 
 		// Check for max path
 		const auto descendants = memfs->EnumerateDescendants(*fileNode, true);

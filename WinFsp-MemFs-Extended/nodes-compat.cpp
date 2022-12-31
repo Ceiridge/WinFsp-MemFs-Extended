@@ -3,6 +3,7 @@
 #include "exceptions.h"
 #include "memfs-interface.h"
 #include "nodes.h"
+#include "utils.h"
 
 namespace Memfs {
 	static NTSTATUS CompatFspFileNodeSetEa(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode, PFILE_FULL_EA_INFORMATION ea) {
@@ -85,5 +86,25 @@ namespace Memfs {
 		}
 
 		return STATUS_SUCCESS;
+	}
+
+	static BOOLEAN CompatAddDirInfo(FileNode* fileNode, PCWSTR fileName, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
+		DynamicStruct<FSP_FSCTL_DIR_INFO> dirInfoBuf(sizeof(FSP_FSCTL_DIR_INFO) + fileNode->fileName.size() + 1);
+		FSP_FSCTL_DIR_INFO* dirInfo = dirInfoBuf.Struct();
+
+		std::wstring fileNameStr;
+		if (fileName == nullptr) {
+			const Utils::SuffixView suffixView = Utils::PathSuffix(fileNode->fileName);
+			fileNameStr = suffixView.Suffix;
+		} else {
+			fileNameStr = fileName;
+		}
+
+		memset(dirInfo->Padding, 0, sizeof dirInfo->Padding);
+		dirInfo->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + fileNameStr.length() * sizeof(WCHAR));
+		dirInfo->FileInfo = fileNode->fileInfo;
+		memcpy(dirInfo->FileNameBuf, fileNameStr.c_str(), dirInfo->Size - sizeof(FSP_FSCTL_DIR_INFO));
+
+		return FspFileSystemAddDirInfo(dirInfo, buffer, length, pBytesTransferred);
 	}
 }

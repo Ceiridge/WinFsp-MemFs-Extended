@@ -138,3 +138,29 @@ std::vector<FileNode*> MemFs::EnumerateDescendants(const FileNode& node, const b
 
 	return descendants;
 }
+
+std::vector<FileNode*> MemFs::EnumerateDirChildren(const FileNode& node, const std::optional<const std::wstring_view&> marker) {
+	std::vector<FileNode*> children;
+	FileNodeMap::iterator iter;
+
+	if (marker.has_value()) {
+		iter = this->fileMap.upper_bound(node.fileName + L"\\" + std::wstring(marker.value()));
+	} else
+		iter = this->fileMap.upper_bound(node.fileName);
+
+	for (; this->fileMap.end() != iter; ++iter) {
+		if (!Utils::FileNameHasPrefix(iter->second.fileName.c_str(), node.fileName.c_str(), this->IsCaseInsensitive()))
+			break;
+
+		const Utils::SuffixView suffixView = Utils::PathSuffix(iter->second.fileName);
+
+		bool isDirectoryChild = 0 == Utils::FileNameCompare(suffixView.RemainPrefix.data(), suffixView.RemainPrefix.length(), node.fileName.c_str(), node.fileName.length(), this->IsCaseInsensitive());
+		isDirectoryChild = isDirectoryChild && suffixView.Suffix.find(L':') == std::string::npos;
+
+		if (isDirectoryChild) {
+			children.push_back(&iter->second);
+		}
+	}
+
+	return children;
+}
