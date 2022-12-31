@@ -16,18 +16,21 @@ namespace Memfs::Interface {
 			/* if this is not the root directory, add the dot entries */
 
 			auto const [parentResult, parent] = memfs->FindParent(fileNode->fileName);
-			if (!parent.has_value())
+			if (!parent.has_value()) {
 				return parentResult;
+			}
 			FileNode& parentNode = parent.value();
 
 			if (marker == nullptr) {
-				if (!CompatAddDirInfo(fileNode, L".", buffer, length, pBytesTransferred))
+				if (!CompatAddDirInfo(fileNode, L".", buffer, length, pBytesTransferred)) {
 					return STATUS_SUCCESS;
+				}
 			}
 
 			if (marker == nullptr || (L'.' == marker[0] && L'\0' == marker[1])) {
-				if (!CompatAddDirInfo(&parentNode, L"..", buffer, length, pBytesTransferred))
+				if (!CompatAddDirInfo(&parentNode, L"..", buffer, length, pBytesTransferred)) {
 					return STATUS_SUCCESS;
+				}
 				marker = nullptr;
 			}
 		}
@@ -58,8 +61,9 @@ namespace Memfs::Interface {
 		std::wstring fileNameStr = std::wstring(fileName) + (needsSlash ? L"\\" : L"") + fileName;
 
 		const auto fileNodeOpt = memfs->FindFile(fileNameStr);
-		if (!fileNodeOpt.has_value())
+		if (!fileNodeOpt.has_value()) {
 			return STATUS_OBJECT_NAME_NOT_FOUND;
+		}
 		const FileNode& fileNode = fileNodeOpt.value();
 
 		const Utils::SuffixView suffixView = Utils::PathSuffix(fileNode.fileName);

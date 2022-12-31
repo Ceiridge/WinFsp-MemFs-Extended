@@ -39,6 +39,7 @@ namespace Memfs {
 		void SetMainNode(std::weak_ptr<FileNode> mainNode);
 
 		FileNodeEaMap& GetEaMap();
+		std::optional<FileNodeEaMap&> GetEaMapOpt();
 		void SetEa(PFILE_FULL_EA_INFORMATION ea);
 		bool NeedsEa();
 		void DeleteEaMap();
@@ -60,4 +61,5 @@ namespace Memfs {
 	static NTSTATUS CompatSetFileSizeInternal(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, UINT64 newSize, BOOLEAN setAllocationSize);
 	static NTSTATUS CompatGetReparsePointByName(FSP_FILE_SYSTEM* fileSystem, PVOID context, PWSTR fileName, BOOLEAN isDirectory, PVOID buffer, PSIZE_T pSize);
 	static BOOLEAN CompatAddDirInfo(FileNode* fileNode, PCWSTR fileName, PVOID buffer, ULONG length, PULONG pBytesTransferred);
+	static BOOLEAN CompatAddStreamInfo(FileNode* fileNode, PVOID buffer, ULONG length, PULONG pBytesTransferred);
 }

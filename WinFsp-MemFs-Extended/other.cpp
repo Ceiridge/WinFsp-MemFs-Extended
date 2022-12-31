@@ -56,4 +56,58 @@ namespace Memfs::Interface {
 			memfs->RemoveNode(*fileNode);
 		}
 	}
+
+	static NTSTATUS GetStreamInfo(FSP_FILE_SYSTEM* fileSystem,
+	                              PVOID fileNode0, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
+		MemFs* memfs = GetMemFs(fileSystem);
+		FileNode* fileNode = GetFileNode(fileNode0);
+		std::shared_ptr<FileNode> mainFileNodeShared;
+
+		if (!fileNode->IsMainNode()) {
+			mainFileNodeShared = fileNode->GetMainNode().lock();
+			fileNode = mainFileNodeShared.get();
+		}
+
+		if (0 == (fileNode->fileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+			!CompatAddStreamInfo(fileNode, buffer, length, pBytesTransferred))
+			return STATUS_SUCCESS;
+
+		// I don't think this makes references
+		for (FileNode* namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
+			if (!CompatAddStreamInfo(namedStream, buffer, length, pBytesTransferred)) {
+				return STATUS_INSUFFICIENT_RESOURCES;
+			}
+		}
+
+		FspFileSystemAddStreamInfo(nullptr, buffer, length, pBytesTransferred); // List end
+		return STATUS_SUCCESS;
+	}
+
+	static NTSTATUS Control(FSP_FILE_SYSTEM* fileSystem,
+	                        PVOID fileNode, UINT32 controlCode,
+	                        PVOID inputBuffer, ULONG inputBufferLength,
+	                        PVOID outputBuffer, ULONG outputBufferLength, PULONG pBytesTransferred) {
+		// The original author found it extremely funny to add ROT13 "encryption" as an IOCTL feature... See below:
+
+		/* MEMFS also supports encryption! See below :) */
+		if (CTL_CODE(0x8000 + 'M', 'R', METHOD_BUFFERED, FILE_ANY_ACCESS) == controlCode) {
+			if (outputBufferLength != inputBufferLength)
+				return STATUS_INVALID_PARAMETER;
+
+			for (PUINT8 P = (PUINT8)inputBuffer, Q = (PUINT8)outputBuffer, EndP = P + inputBufferLength;
+			     EndP > P; P++, Q++) {
+				if (('A' <= *P && *P <= 'M') || ('a' <= *P && *P <= 'm'))
+					*Q = *P + 13;
+				else if (('N' <= *P && *P <= 'Z') || ('n' <= *P && *P <= 'z'))
+					*Q = *P - 13;
+				else
+					*Q = *P;
+			}
+
+			*pBytesTransferred = inputBufferLength;
+			return STATUS_SUCCESS;
+		}
+
+		return STATUS_INVALID_DEVICE_REQUEST;
+	}
 }

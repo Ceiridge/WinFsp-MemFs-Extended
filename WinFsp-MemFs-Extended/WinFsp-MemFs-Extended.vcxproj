@@ -22,6 +22,7 @@
     <ClCompile Include="basic.cpp" />
     <ClCompile Include="comparisons.cpp" />
     <ClCompile Include="create.cpp" />
+    <ClCompile Include="ea.cpp" />
     <ClCompile Include="exceptions.cpp" />
     <ClCompile Include="fileinfo.cpp" />
     <ClCompile Include="filemap.cpp" />
@@ -32,6 +33,7 @@
     <ClCompile Include="nodes.cpp" />
     <ClCompile Include="filecreate.cpp" />
     <ClCompile Include="other.cpp" />
+    <ClCompile Include="reparse.cpp" />
     <ClCompile Include="sectors.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="totalsize.cpp" />

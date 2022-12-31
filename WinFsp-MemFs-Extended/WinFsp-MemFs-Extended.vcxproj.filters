@@ -75,6 +75,12 @@
     <ClCompile Include="fileinfo.cpp">
       <Filter>Quelldateien\interface</Filter>
     </ClCompile>
+    <ClCompile Include="reparse.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </ClCompile>
+    <ClCompile Include="ea.cpp">
+      <Filter>Quelldateien\interface</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="memfs.h">

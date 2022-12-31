@@ -80,6 +80,18 @@ FileNodeEaMap& FileNode::GetEaMap() {
 	return this->eaMap.value();
 }
 
+std::optional<FileNodeEaMap&> FileNode::GetEaMapOpt() {
+	if (!this->IsMainNode()) {
+		return this->mainFileNode.lock()->GetEaMapOpt();
+	}
+
+	if (!this->eaMap.has_value()) {
+		return {};
+	}
+
+	return this->eaMap.value();
+}
+
 void FileNode::SetEa(PFILE_FULL_EA_INFORMATION ea) {
 	auto& fileNodeEaDynamic = *static_cast<DynamicStruct<FILE_FULL_EA_INFORMATION>*>(nullptr);
 	FILE_FULL_EA_INFORMATION* fileNodeEa = nullptr;

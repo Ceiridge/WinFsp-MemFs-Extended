@@ -107,4 +107,22 @@ namespace Memfs {
 
 		return FspFileSystemAddDirInfo(dirInfo, buffer, length, pBytesTransferred);
 	}
+
+	static BOOLEAN CompatAddStreamInfo(FileNode* fileNode, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
+		DynamicStruct<FSP_FSCTL_STREAM_INFO> streamInfoBuf(sizeof(FSP_FSCTL_STREAM_INFO) + fileNode->fileName.size() + 1);
+		FSP_FSCTL_STREAM_INFO* streamInfo = streamInfoBuf.Struct();
+
+		const auto streamNamePos = fileNode->fileName.find_first_of(L':');
+		std::wstring streamName;
+		if (streamNamePos != std::string::npos) {
+			streamName = fileNode->fileName.substr(streamNamePos + 1);
+		}
+
+		streamInfo->Size = (UINT16)(sizeof(FSP_FSCTL_STREAM_INFO) + streamName.length() * sizeof(WCHAR));
+		streamInfo->StreamSize = fileNode->fileInfo.FileSize;
+		streamInfo->StreamAllocationSize = fileNode->fileInfo.AllocationSize;
+		memcpy(streamInfo->StreamNameBuf, streamName.c_str(), streamInfo->Size - sizeof(FSP_FSCTL_STREAM_INFO));
+
+		return FspFileSystemAddStreamInfo(streamInfo, buffer, length, pBytesTransferred);
+	}
 }
