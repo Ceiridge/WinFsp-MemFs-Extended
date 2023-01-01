@@ -8,10 +8,6 @@ FSP_FILE_SYSTEM* MemFs::GetRawFileSystem() const {
 	return this->fileSystem.get();
 }
 
-FileNodeMap& MemFs::GetRawFileMap() {
-	return this->fileMap;
-}
-
 std::wstring& MemFs::GetVolumeLabel() {
 	return this->volumeLabel;
 }

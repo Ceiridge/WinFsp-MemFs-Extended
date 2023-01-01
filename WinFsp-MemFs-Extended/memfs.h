@@ -64,9 +64,7 @@ namespace Memfs {
 
 		std::vector<FileNode*> EnumerateNamedStreams(const FileNode& node, const bool references);
 		std::vector<FileNode*> EnumerateDescendants(const FileNode& node, const bool references);
-		std::vector<FileNode*> EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker);
-
-		FileNodeMap& GetRawFileMap();
+		std::vector<FileNode*> EnumerateDirChildren(const FileNode& node, const wchar_t* marker);
 
 	private:
 		std::unique_ptr<FSP_FILE_SYSTEM> fileSystem;

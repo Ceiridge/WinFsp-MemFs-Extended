@@ -3,8 +3,8 @@
 
 namespace Memfs::Interface {
 	NTSTATUS ReadDirectory(FSP_FILE_SYSTEM* fileSystem,
-		PVOID fileNode0, PWSTR pattern, PWSTR marker,
-		PVOID buffer, ULONG length, PULONG pBytesTransferred) {
+	                       PVOID fileNode0, PWSTR pattern, PWSTR marker,
+	                       PVOID buffer, ULONG length, PULONG pBytesTransferred) {
 		assert(nullptr == pattern);
 
 		MemFs* memfs = GetMemFs(fileSystem);
@@ -33,10 +33,7 @@ namespace Memfs::Interface {
 			}
 		}
 
-		const std::wstring_view markerView = marker ? marker : L"";
-		const std::refoptional<const std::wstring_view> markerOpt = (marker == nullptr) ? std::nullopt : std::make_optional(markerView);
-
-		for (const auto& child : memfs->EnumerateDirChildren(*fileNode, markerOpt)) {
+		for (const auto& child : memfs->EnumerateDirChildren(*fileNode, marker)) {
 			if (!CompatAddDirInfo(child, nullptr, buffer, length, pBytesTransferred)) {
 				return STATUS_SUCCESS; // Without end
 			}
@@ -47,7 +44,7 @@ namespace Memfs::Interface {
 	}
 
 	NTSTATUS GetDirInfoByName(FSP_FILE_SYSTEM* fileSystem,
-		PVOID parentNode0, PWSTR fileName, FSP_FSCTL_DIR_INFO* dirInfo) {
+	                          PVOID parentNode0, PWSTR fileName, FSP_FSCTL_DIR_INFO* dirInfo) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* parentNode = GetFileNode(parentNode0);
 

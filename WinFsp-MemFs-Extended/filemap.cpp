@@ -81,8 +81,7 @@ bool MemFs::HasChild(const FileNode& node) {
 
 std::pair<NTSTATUS, FileNode*> MemFs::InsertNode(FileNode* node) {
 	try {
-		std::wstring fileName = node->fileName;
-		const auto [iter, success] = this->fileMap.insert(FileNodeMap::value_type(fileName, node));
+		const auto [iter, success] = this->fileMap.emplace(node->fileName, node);
 
 		if (success) {
 			iter->second->Reference();
@@ -102,12 +101,9 @@ std::pair<NTSTATUS, FileNode&> MemFs::InsertNode(FileNode&& node) {
 }
 
 void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
-	const auto iter = this->fileMap.find(node.fileName);
-	if (iter == this->fileMap.end()) {
+	if (!this->fileMap.erase(node.fileName)) {
 		return;
 	}
-
-	this->fileMap.erase(iter);
 
 	// memefs: Quickly report counter about deleted sectors
 	if (reportDeletedSize) {
@@ -152,12 +148,13 @@ std::vector<FileNode*> MemFs::EnumerateDescendants(const FileNode& node, const b
 	return descendants;
 }
 
-std::vector<FileNode*> MemFs::EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker) {
+std::vector<FileNode*> MemFs::EnumerateDirChildren(const FileNode& node, const wchar_t* marker) {
 	std::vector<FileNode*> children;
 	FileNodeMap::iterator iter;
 
-	if (marker.has_value()) {
-		iter = this->fileMap.upper_bound(node.fileName + L"\\" + std::wstring(marker.value()));
+	if (marker) {
+		const bool needsSlash = node.fileName.length() != 1 || node.fileName[0] != L'\\';
+		iter = this->fileMap.upper_bound(node.fileName + (needsSlash ? L"\\" : L"") + marker);
 	} else
 		iter = this->fileMap.upper_bound(node.fileName);
 

@@ -100,7 +100,7 @@ FileNodeEaMap& FileNode::GetEaMap() {
 	}
 
 	if (!this->eaMap.has_value()) {
-		this->eaMap = std::make_optional(FileNodeEaMap());
+		this->eaMap = FileNodeEaMap();
 	}
 
 	return this->eaMap.value();

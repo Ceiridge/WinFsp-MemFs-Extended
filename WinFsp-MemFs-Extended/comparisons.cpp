@@ -30,7 +30,9 @@ namespace Memfs::Utils {
 		int v = 0;
 		for (const void* e = t + n; e > (const void*)t; ++s, ++t)
 		{
-			unsigned sc = *s, tc = *t;
+			const unsigned sc = *s;
+			const unsigned tc = *t;
+
 			if (0xffffff80 & (sc | tc))
 			{
 				v = CompareStringW(LOCALE_INVARIANT, NORM_IGNORECASE, s0, n, t0, n);
@@ -83,7 +85,7 @@ namespace Memfs::Utils {
 
 			len = plen < qlen ? plen : qlen;
 
-			if (caseInsensitive) {
+			if (caseInsensitive) [[likely]] {
 				res = EfficientWcsnicmp(partp, partq, len);
 			} else
 				res = wcsncmp(partp, partq, len);
@@ -110,9 +112,8 @@ namespace Memfs::Utils {
 	int EaNameCompare(const PCSTR a, const PCSTR b) {
 		/* EA names are always case-insensitive in MEMFS (to be inline with NTFS) */
 
-		int res;
+		int res = CompareStringA(LOCALE_INVARIANT, NORM_IGNORECASE, a, -1, b, -1);
 
-		res = CompareStringA(LOCALE_INVARIANT, NORM_IGNORECASE, a, -1, b, -1);
 		if (0 != res)
 			res -= 2;
 		else
