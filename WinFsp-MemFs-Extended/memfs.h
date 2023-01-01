@@ -77,9 +77,6 @@ namespace Memfs {
 
 		SectorManager sectors;
 		FileNodeMap fileMap;
-
-		// std::unordered_map<MEMFS_FILE_NODE*, UINT64> toBeDeletedFileNodeSizes;
-		// std::mutex toBeDeletedFileNodeMutex;
 	};
 
 	inline MemFs* MEMFS_SINGLETON;

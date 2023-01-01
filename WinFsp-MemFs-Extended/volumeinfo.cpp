@@ -4,10 +4,9 @@ namespace Memfs::Interface {
 	NTSTATUS GetVolumeInfo(FSP_FILE_SYSTEM* fileSystem, FSP_FSCTL_VOLUME_INFO* volumeInfo) {
 		MemFs* memfs = GetMemFs(fileSystem);
 
-		// TODO: Fix toBeDeleted stuff
-		const UINT64 toBeDeletedSize = 0ULL; //InterlockedExchangeAdd(&Memfs->AllocatedSizesToBeDeleted, 0ULL);
+		// TODO: This is only called by the Explorer when a file is changed (maybe directory change notifier), causing this to report wrong sizes
 		const UINT64 maxSize = memfs->CalculateMaxTotalSize();
-		const UINT64 availableSize = memfs->CalculateAvailableTotalSize() + toBeDeletedSize;
+		const UINT64 availableSize = memfs->CalculateAvailableTotalSize();
 
 		volumeInfo->TotalSize = maxSize;
 		volumeInfo->FreeSize = availableSize;

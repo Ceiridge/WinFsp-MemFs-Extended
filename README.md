@@ -7,7 +7,6 @@
 - Better storage limit indication
 - *Total memory* limit instead of *file node \* individual size* limit
 - Ability to set the volume label via the CLI (-l)
-- More efficient memory management by resetting the heap when all files are fully deleted
 
 ### Benchmarks
 ![Unpreallocated File Write Times](benchmarks/unprealloctimes.avif) \

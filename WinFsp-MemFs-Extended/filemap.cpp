@@ -105,11 +105,6 @@ void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
 		return;
 	}
 
-	// memefs: Quickly report counter about deleted sectors
-	if (reportDeletedSize) {
-		// TODO: toBeDeleted stuff
-	}
-
 	this->TouchParent(node);
 	node.Dereference(true);
 }

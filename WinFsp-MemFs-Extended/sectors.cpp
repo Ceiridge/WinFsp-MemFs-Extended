@@ -169,12 +169,6 @@ void ForceTemplateFunctionGenerationHelper() {
 SectorNode::~SectorNode() {
 	SectorManager& sectorManager = MEMFS_SINGLETON->GetSectorManager();
 	sectorManager.Free(*this);
-
-	// TODO: Free heap
-	// memefs: If fully empty, recreate the heap
-	/*if (sectorManager.IsFullyEmpty()) {
-		MEMFS_SINGLETON->RecreateSectorManager();
-	}*/
 }
 
 SectorNode::SectorNode(SectorNode&& other) noexcept : Sectors(std::move(other.Sectors)) {}
