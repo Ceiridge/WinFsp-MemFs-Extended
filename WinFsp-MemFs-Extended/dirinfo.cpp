@@ -37,7 +37,7 @@ namespace Memfs::Interface {
 		const std::refoptional<const std::wstring_view> markerOpt = (marker == nullptr) ? std::nullopt : std::make_optional(markerView);
 
 		for (const auto& child : memfs->EnumerateDirChildren(*fileNode, markerOpt)) {
-			if (!CompatAddDirInfo(child.get(), nullptr, buffer, length, pBytesTransferred)) {
+			if (!CompatAddDirInfo(child, nullptr, buffer, length, pBytesTransferred)) {
 				return STATUS_SUCCESS; // Without end
 			}
 		}

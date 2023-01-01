@@ -22,14 +22,10 @@
 #include "sectors.h"
 
 namespace Memfs {
-	using FileNodeMap = std::map<std::wstring, std::shared_ptr<FileNode>, Utils::FileLess>;
-	using FileReferenceMap = concurrency::concurrent_unordered_map<UINT64, std::shared_ptr<FileNode>>;
+	using FileNodeMap = std::map<std::wstring, FileNode*, Utils::FileLess>;
 
 	class MemFs {
 	public:
-		FileReferenceMap refMap;
-		std::shared_mutex refMapEraseMutex;
-
 		MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const wchar_t* volumePrefix, const wchar_t* volumeLabel, const wchar_t* rootSddl);
 		~MemFs();
 		explicit MemFs(const MemFs& other) = delete;
@@ -57,18 +53,18 @@ namespace Memfs {
 
 		[[nodiscard]] bool IsCaseInsensitive() const;
 		std::refoptional<FileNode> FindFile(const std::wstring_view& fileName);
-		std::refoptional<std::shared_ptr<FileNode>> FindMainFromStream(const std::wstring_view& fileName);
+		std::optional<FileNode*> FindMainFromStream(const std::wstring_view& fileName);
 		std::pair<NTSTATUS, std::refoptional<FileNode>> FindParent(const std::wstring_view& fileName);
 		void TouchParent(const FileNode& node);
 		bool HasChild(const FileNode& node);
 
-		std::pair<NTSTATUS, const std::shared_ptr<FileNode>&> InsertNode(const std::shared_ptr<FileNode>& node);
+		std::pair<NTSTATUS, FileNode*> InsertNode(FileNode* node);
 		std::pair<NTSTATUS, FileNode&> InsertNode(FileNode&& node);
 		void RemoveNode(FileNode& node, const bool reportDeletedSize = true);
 
-		std::vector<std::shared_ptr<FileNode>> EnumerateNamedStreams(const FileNode& node, const bool references);
-		std::vector<std::shared_ptr<FileNode>> EnumerateDescendants(const FileNode& node, const bool references);
-		std::vector<std::shared_ptr<FileNode>> EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker);
+		std::vector<FileNode*> EnumerateNamedStreams(const FileNode& node, const bool references);
+		std::vector<FileNode*> EnumerateDescendants(const FileNode& node, const bool references);
+		std::vector<FileNode*> EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker);
 
 		FileNodeMap& GetRawFileMap();
 

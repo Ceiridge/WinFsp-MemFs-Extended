@@ -26,12 +26,9 @@ options:
     -i                  [case insensitive file system]
     -f                  [flush and purge cache on cleanup]
     -s MaxFsSize        [bytes of maximum total memory size]
-    -M MaxDelay         [maximum slow IO delay in millis]
-    -P PercentDelay     [percent of slow IO to make pending]
-    -R RarefyDelay      [adjust the rarity of pending slow IO]
     -F FileSystemName
     -S RootSddl         [file rights: FA, etc; NO generic rights: GA, etc.]
-    -u \Server\Share    [UNC prefix (single backslash)]
+    -u \Server\Share  [UNC prefix (single backslash)]
     -m MountPoint       [X:|* (required if no UNC prefix)]
     -l VolumeLabel      [optional volume label name]
 ```

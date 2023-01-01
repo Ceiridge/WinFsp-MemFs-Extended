@@ -11,11 +11,9 @@ namespace Memfs::Interface {
 	                      PVOID fileNode0, UINT32 fileAttributes,
 	                      UINT64 creationTime, UINT64 lastAccessTime, UINT64 lastWriteTime, UINT64 changeTime, FSP_FSCTL_FILE_INFO* fileInfo) {
 		FileNode* fileNode = GetFileNode(fileNode0);
-		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		if (!fileNode->IsMainNode()) {
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			fileNode = mainFileNodeShared.get();
+			fileNode = fileNode->GetMainNode();
 		}
 
 		if (INVALID_FILE_ATTRIBUTES != fileAttributes) {
@@ -85,7 +83,7 @@ namespace Memfs::Interface {
 		const ULONG newFileNameLen = (ULONG)wcslen(newFileName);
 
 		// Check for max path
-		const auto descendants = memfs->EnumerateDescendants(*fileNode, false);
+		const auto descendants = memfs->EnumerateDescendants(*fileNode, true);
 		for (const auto& descendant : descendants) {
 			if (MEMFS_MAX_PATH <= descendant->fileName.length() - fileNameLen + newFileNameLen) {
 				return STATUS_OBJECT_NAME_INVALID;
@@ -112,6 +110,8 @@ namespace Memfs::Interface {
 				FspDebugLog(__FUNCTION__ ": cannot insert into FileNodeMap; aborting\n");
 				abort();
 			}
+
+			descendant->Dereference(); // Remove the reference from the descendant enumeration above
 		}
 
 		return STATUS_SUCCESS;

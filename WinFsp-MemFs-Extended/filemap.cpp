@@ -17,7 +17,7 @@ std::refoptional<FileNode> MemFs::FindFile(const std::wstring_view& fileName) {
 	return *iter->second;
 }
 
-std::refoptional<std::shared_ptr<FileNode>> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
+std::optional<FileNode*> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
 	const auto colonPos = std::ranges::find(fileName, L':');
 	std::wstring mainName;
 
@@ -79,7 +79,7 @@ bool MemFs::HasChild(const FileNode& node) {
 	return result;
 }
 
-std::pair<NTSTATUS, const std::shared_ptr<FileNode>&> MemFs::InsertNode(const std::shared_ptr<FileNode>& node) {
+std::pair<NTSTATUS, FileNode*> MemFs::InsertNode(FileNode* node) {
 	try {
 		std::wstring fileName = node->fileName;
 		const auto [iter, success] = this->fileMap.insert(FileNodeMap::value_type(fileName, node));
@@ -96,8 +96,8 @@ std::pair<NTSTATUS, const std::shared_ptr<FileNode>&> MemFs::InsertNode(const st
 }
 
 std::pair<NTSTATUS, FileNode&> MemFs::InsertNode(FileNode&& node) {
-	const auto [status, ptr] = this->InsertNode(std::make_shared<FileNode>(std::move
-		(node)));
+	FileNode* allocatedNode{new FileNode(std::move(node))};
+	const auto [status, ptr] = this->InsertNode(allocatedNode);
 	return {status, *ptr};
 }
 
@@ -107,7 +107,6 @@ void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
 		return;
 	}
 
-	std::shared_ptr<FileNode> survivor = iter->second; // FileNode will deallocate after this scope
 	this->fileMap.erase(iter);
 
 	// memefs: Quickly report counter about deleted sectors
@@ -119,8 +118,8 @@ void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
 	node.Dereference(true);
 }
 
-std::vector<std::shared_ptr<FileNode>> MemFs::EnumerateNamedStreams(const FileNode& node, const bool references) {
-	std::vector<std::shared_ptr<FileNode>> namedStreams;
+std::vector<FileNode*> MemFs::EnumerateNamedStreams(const FileNode& node, const bool references) {
+	std::vector<FileNode*> namedStreams;
 
 	for (auto iter = this->fileMap.upper_bound(node.fileName); this->fileMap.end() != iter; ++iter) {
 		if (!Utils::FileNameHasPrefix(iter->second->fileName.c_str(), node.fileName.c_str(), this->IsCaseInsensitive()))
@@ -137,8 +136,8 @@ std::vector<std::shared_ptr<FileNode>> MemFs::EnumerateNamedStreams(const FileNo
 	return namedStreams;
 }
 
-std::vector<std::shared_ptr<FileNode>> MemFs::EnumerateDescendants(const FileNode& node, const bool references) {
-	std::vector<std::shared_ptr<FileNode>> descendants;
+std::vector<FileNode*> MemFs::EnumerateDescendants(const FileNode& node, const bool references) {
+	std::vector<FileNode*> descendants;
 
 	for (auto iter = this->fileMap.lower_bound(node.fileName); this->fileMap.end() != iter; ++iter) {
 		if (!Utils::FileNameHasPrefix(iter->second->fileName.c_str(), node.fileName.c_str(), this->IsCaseInsensitive()))
@@ -153,8 +152,8 @@ std::vector<std::shared_ptr<FileNode>> MemFs::EnumerateDescendants(const FileNod
 	return descendants;
 }
 
-std::vector<std::shared_ptr<FileNode>> MemFs::EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker) {
-	std::vector<std::shared_ptr<FileNode>> children;
+std::vector<FileNode*> MemFs::EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker) {
+	std::vector<FileNode*> children;
 	FileNodeMap::iterator iter;
 
 	if (marker.has_value()) {

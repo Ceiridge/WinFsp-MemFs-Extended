@@ -8,7 +8,7 @@
 using namespace Memfs;
 
 static volatile UINT64 IndexNumber = 1;
-static constexpr bool LOG_REFERENCES = false;
+static constexpr bool LOG_REFERENCES = false; // Debug option
 
 FileNode::FileNode(const std::wstring& fileName) : fileName(fileName) {
 	this->EnsureFileNameLength();
@@ -39,15 +39,6 @@ long FileNode::GetReferenceCount(const bool withInterlock) {
 void FileNode::Reference() {
 	InterlockedIncrement(&this->refCount);
 
-	if (MEMFS_SINGLETON == nullptr) {
-		return;
-	}
-
-	auto& refMap = MEMFS_SINGLETON->refMap;
-	if (refMap.find(this->fileInfo.IndexNumber) == refMap.end()) {
-		refMap[this->fileInfo.IndexNumber] = this->shared_from_this();
-	}
-
 	if (LOG_REFERENCES) {
 		FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"+%d for %s", this->refCount, this->fileName.c_str());
 	}
@@ -73,13 +64,7 @@ void FileNode::Dereference(const bool toZero) {
 			FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"Removing %s", this->fileName.c_str());
 		}
 
-		std::unique_lock eraseLock(MEMFS_SINGLETON->refMapEraseMutex);
-		try {
-			MEMFS_SINGLETON->refMap.unsafe_erase(this->fileInfo.IndexNumber);
-		} catch (...) {
-			// This will never happen, but if it does, the program must not crash
-			FspServiceLog(EVENTLOG_ERROR_TYPE, (PWSTR)L"Index could not be erased");
-		}
+		delete this; // This better not cause any problems
 	}
 }
 
@@ -87,7 +72,7 @@ void FileNode::CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const {
 	if (this->IsMainNode()) {
 		*fileInfoDest = this->fileInfo;
 	} else {
-		const auto mainFile = this->mainFileNode.lock();
+		const auto mainFile = this->mainFileNode;
 		*fileInfoDest = mainFile->fileInfo;
 
 		fileInfoDest->FileAttributes &= ~FILE_ATTRIBUTE_DIRECTORY;
@@ -98,20 +83,20 @@ void FileNode::CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const {
 }
 
 bool FileNode::IsMainNode() const {
-	return this->mainFileNode.expired();
+	return this->mainFileNode == nullptr;
 }
 
-std::weak_ptr<FileNode>& FileNode::GetMainNode() {
+FileNode* FileNode::GetMainNode() const {
 	return this->mainFileNode;
 }
 
-void FileNode::SetMainNode(const std::weak_ptr<FileNode> mainNode) {
+void FileNode::SetMainNode(FileNode* mainNode) {
 	this->mainFileNode = mainNode;
 }
 
 FileNodeEaMap& FileNode::GetEaMap() {
 	if (!this->IsMainNode()) {
-		return this->mainFileNode.lock()->GetEaMap();
+		return this->mainFileNode->GetEaMap();
 	}
 
 	if (!this->eaMap.has_value()) {
@@ -123,7 +108,7 @@ FileNodeEaMap& FileNode::GetEaMap() {
 
 std::refoptional<FileNodeEaMap> FileNode::GetEaMapOpt() {
 	if (!this->IsMainNode()) {
-		return this->mainFileNode.lock()->GetEaMapOpt();
+		return this->mainFileNode->GetEaMapOpt();
 	}
 
 	if (!this->eaMap.has_value()) {
@@ -172,7 +157,7 @@ void FileNode::SetEa(PFILE_FULL_EA_INFORMATION ea) {
 
 bool FileNode::NeedsEa() {
 	if (!this->IsMainNode()) {
-		return this->mainFileNode.lock()->NeedsEa();
+		return this->mainFileNode->NeedsEa();
 	}
 
 	if (!this->eaMap.has_value()) {

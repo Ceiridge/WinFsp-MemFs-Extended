@@ -62,7 +62,7 @@ namespace Memfs::Interface {
 
 			const auto mainNode = memfs->FindMainFromStream(fileName);
 			if (mainNode.has_value()) {
-				fileNode.SetMainNode(mainNode.value().get());
+				fileNode.SetMainNode(mainNode.value());
 			}
 
 			fileNode.fileInfo.FileAttributes = (fileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? fileAttributes : fileAttributes | FILE_ATTRIBUTE_ARCHIVE;

@@ -13,11 +13,9 @@ namespace Memfs::Interface {
 	                                PVOID fileNode0,
 	                                PWSTR fileName, PVOID buffer, PSIZE_T pSize) {
 		FileNode* fileNode = GetFileNode(fileNode0);
-		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		if (!fileNode->IsMainNode()) {
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			fileNode = mainFileNodeShared.get();
+			fileNode = fileNode->GetMainNode();
 		}
 
 		if (0 == (fileNode->fileInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
@@ -39,11 +37,9 @@ namespace Memfs::Interface {
 	                                PWSTR fileName, PVOID buffer, SIZE_T size) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
-		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		if (!fileNode->IsMainNode()) {
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			fileNode = mainFileNodeShared.get();
+			fileNode = fileNode->GetMainNode();
 		}
 
 		if (memfs->HasChild(*fileNode)) {
@@ -80,11 +76,9 @@ namespace Memfs::Interface {
 	                                   PWSTR fileName, PVOID buffer, SIZE_T size) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
-		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		if (!fileNode->IsMainNode()) {
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			fileNode = mainFileNodeShared.get();
+			fileNode = fileNode->GetMainNode();
 		}
 
 		if (fileNode->reparseData.HoldsStruct()) {

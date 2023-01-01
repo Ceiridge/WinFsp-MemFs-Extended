@@ -9,7 +9,7 @@
 namespace Memfs {
 	using FileNodeEaMap = std::map<std::string, DynamicStruct<FILE_FULL_EA_INFORMATION>, Utils::EaLess>;
 
-	class FileNode : public std::enable_shared_from_this<FileNode> {
+	class FileNode {
 	public:
 		std::wstring fileName; // Has to be constrained!
 		FSP_FSCTL_FILE_INFO fileInfo{};
@@ -31,8 +31,8 @@ namespace Memfs {
 		void CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const;
 
 		[[nodiscard]] bool IsMainNode() const;
-		std::weak_ptr<FileNode>& GetMainNode();
-		void SetMainNode(std::weak_ptr<FileNode> mainNode);
+		FileNode* GetMainNode() const;
+		void SetMainNode(FileNode* mainNode);
 
 		FileNodeEaMap& GetEaMap();
 		std::refoptional<FileNodeEaMap> GetEaMapOpt();
@@ -49,7 +49,7 @@ namespace Memfs {
 		SectorNode sectors;
 		volatile long refCount{0};
 
-		std::weak_ptr<FileNode> mainFileNode;
+		FileNode* mainFileNode{};
 		std::optional<FileNodeEaMap> eaMap;
 	};
 

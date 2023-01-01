@@ -22,14 +22,12 @@ namespace Memfs::Interface {
 			return result;
 		}
 		FileNode* fileNode = &fileNodeOpt.value().get();
-		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		UINT32 fileAttributesMask = ~(UINT32)0;
 		if (!fileNode->IsMainNode()) {
 			fileAttributesMask = ~(UINT32)FILE_ATTRIBUTE_DIRECTORY;
 
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			fileNode = mainFileNodeShared.get();
+			fileNode = fileNode->GetMainNode();
 		}
 
 		if (pFileAttributes != nullptr) {
@@ -55,11 +53,9 @@ namespace Memfs::Interface {
 	NTSTATUS GetSecurity(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
 	                            PSECURITY_DESCRIPTOR securityDescriptor, SIZE_T* pSecurityDescriptorSize) {
 		FileNode* fileNode = GetFileNode(fileNode0);
-		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		if (!fileNode->IsMainNode()) {
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			fileNode = mainFileNodeShared.get();
+			fileNode = fileNode->GetMainNode();
 		}
 
 		if (fileNode->fileSecurity.WantedByteSize() > *pSecurityDescriptorSize) {
@@ -78,13 +74,11 @@ namespace Memfs::Interface {
 	NTSTATUS SetSecurity(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0,
 	                            SECURITY_INFORMATION securityInformation, PSECURITY_DESCRIPTOR modificationDescriptor) {
 		FileNode* fileNode = GetFileNode(fileNode0);
-		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		PSECURITY_DESCRIPTOR newSecurityDescriptor;
 
 		if (!fileNode->IsMainNode()) {
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			fileNode = mainFileNodeShared.get();
+			fileNode = fileNode->GetMainNode();
 		}
 
 		NTSTATUS result = FspSetSecurityDescriptor(

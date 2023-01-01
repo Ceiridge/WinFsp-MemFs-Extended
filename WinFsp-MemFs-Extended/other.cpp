@@ -8,12 +8,10 @@ namespace Memfs::Interface {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
 
-		std::shared_ptr<FileNode> mainFileNodeShared;
 		FileNode* mainFileNode;
 
 		if (!fileNode->IsMainNode()) {
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			mainFileNode = mainFileNodeShared.get();
+			mainFileNode = fileNode->GetMainNode();
 		} else {
 			mainFileNode = fileNode;
 		}
@@ -61,11 +59,9 @@ namespace Memfs::Interface {
 	                              PVOID fileNode0, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
-		std::shared_ptr<FileNode> mainFileNodeShared;
 
 		if (!fileNode->IsMainNode()) {
-			mainFileNodeShared = fileNode->GetMainNode().lock();
-			fileNode = mainFileNodeShared.get();
+			fileNode = fileNode->GetMainNode();
 		}
 
 		if (0 == (fileNode->fileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
@@ -74,7 +70,7 @@ namespace Memfs::Interface {
 
 		// I don't think this makes references
 		for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
-			if (!CompatAddStreamInfo(namedStream.get(), buffer, length, pBytesTransferred)) {
+			if (!CompatAddStreamInfo(namedStream, buffer, length, pBytesTransferred)) {
 				return STATUS_SUCCESS; // Without end
 			}
 		}
