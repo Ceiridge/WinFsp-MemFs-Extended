@@ -44,8 +44,9 @@ namespace Memfs::Interface {
 		FileNode* fileNode = GetFileNode(fileNode0);
 
 		const NTSTATUS result = CompatSetFileSizeInternal(fileSystem, fileNode, newSize, setAllocationSize);
-		if (!NT_SUCCESS(result))
+		if (!NT_SUCCESS(result)) {
 			return result;
+		}
 
 		fileNode->CopyFileInfo(fileInfo);
 		return STATUS_SUCCESS;

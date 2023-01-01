@@ -74,7 +74,12 @@ void FileNode::Dereference(const bool toZero) {
 		}
 
 		std::unique_lock eraseLock(MEMFS_SINGLETON->refMapEraseMutex);
-		MEMFS_SINGLETON->refMap.unsafe_erase(this->fileInfo.IndexNumber);
+		try {
+			MEMFS_SINGLETON->refMap.unsafe_erase(this->fileInfo.IndexNumber);
+		} catch (...) {
+			// This will never happen, but if it does, the program must not crash
+			FspServiceLog(EVENTLOG_ERROR_TYPE, (PWSTR)L"Index could not be erased");
+		}
 	}
 }
 
