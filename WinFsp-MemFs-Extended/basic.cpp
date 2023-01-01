@@ -12,10 +12,6 @@ FileNodeMap& MemFs::GetRawFileMap() {
 	return this->fileMap;
 }
 
-FileReferenceMap& MemFs::GetRawRefMap() {
-	return this->refMap;
-}
-
 std::wstring& MemFs::GetVolumeLabel() {
 	return this->volumeLabel;
 }

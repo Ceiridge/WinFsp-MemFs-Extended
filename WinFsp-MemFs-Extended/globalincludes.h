@@ -4,12 +4,12 @@
 #include <winfsp/winfsp.h>
 
 #include <map>
-#include <unordered_map>
+#include <concurrent_unordered_map.h>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <mutex>
+#include <shared_mutex>
 #include <vector>
 #include <type_traits>
 #include <exception>
@@ -17,6 +17,7 @@
 #include <cassert>
 #include <sddl.h>
 
+// Modifying std for convenience, although not recommended
 namespace std {
 	template <typename T>
 	using refoptional = optional<reference_wrapper<T>>;

@@ -115,7 +115,7 @@ void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
 		// TODO: toBeDeleted stuff
 	}
 
-	this->TouchParent(node); // TODO: Might be out of scope here?
+	this->TouchParent(node);
 	node.Dereference(true);
 }
 

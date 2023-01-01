@@ -23,10 +23,13 @@
 
 namespace Memfs {
 	using FileNodeMap = std::map<std::wstring, std::shared_ptr<FileNode>, Utils::FileLess>;
-	using FileReferenceMap = std::unordered_map<UINT64, std::shared_ptr<FileNode>>;
+	using FileReferenceMap = concurrency::concurrent_unordered_map<UINT64, std::shared_ptr<FileNode>>;
 
 	class MemFs {
 	public:
+		FileReferenceMap refMap;
+		std::shared_mutex refMapEraseMutex;
+
 		MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const wchar_t* volumePrefix, const wchar_t* volumeLabel, const wchar_t* rootSddl);
 		~MemFs();
 		explicit MemFs(const MemFs& other) = delete;
@@ -68,7 +71,6 @@ namespace Memfs {
 		std::vector<std::shared_ptr<FileNode>> EnumerateDirChildren(const FileNode& node, const std::refoptional<const std::wstring_view> marker);
 
 		FileNodeMap& GetRawFileMap();
-		FileReferenceMap& GetRawRefMap();
 
 	private:
 		std::unique_ptr<FSP_FILE_SYSTEM> fileSystem;
@@ -80,7 +82,6 @@ namespace Memfs {
 		std::wstring volumeLabel{L"MEMEFS"};
 
 		SectorManager sectors;
-		FileReferenceMap refMap;
 		FileNodeMap fileMap;
 
 		// std::unordered_map<MEMFS_FILE_NODE*, UINT64> toBeDeletedFileNodeSizes;

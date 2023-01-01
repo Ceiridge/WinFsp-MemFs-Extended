@@ -42,9 +42,10 @@ void FileNode::Reference() {
 	if (MEMFS_SINGLETON == nullptr) {
 		return;
 	}
-	auto& refMap = MEMFS_SINGLETON->GetRawRefMap();
-	if (!refMap.contains(this->fileInfo.IndexNumber)) {
-		refMap.insert_or_assign(this->fileInfo.IndexNumber, this->shared_from_this());
+
+	auto& refMap = MEMFS_SINGLETON->refMap;
+	if (refMap.find(this->fileInfo.IndexNumber) == refMap.end()) {
+		refMap[this->fileInfo.IndexNumber] = this->shared_from_this();
 	}
 
 	if (LOG_REFERENCES) {
@@ -72,7 +73,8 @@ void FileNode::Dereference(const bool toZero) {
 			FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"Removing %s", this->fileName.c_str());
 		}
 
-		MEMFS_SINGLETON->GetRawRefMap().erase(this->fileInfo.IndexNumber);
+		std::unique_lock eraseLock(MEMFS_SINGLETON->refMapEraseMutex);
+		MEMFS_SINGLETON->refMap.unsafe_erase(this->fileInfo.IndexNumber);
 	}
 }
 

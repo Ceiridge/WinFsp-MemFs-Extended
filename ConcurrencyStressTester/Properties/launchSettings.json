@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "ConcurrencyStressTester": {
+      "commandName": "Project",
+      "commandLineArgs": "all",
+      "workingDirectory": "R:\\"
+    }
+  }
+}

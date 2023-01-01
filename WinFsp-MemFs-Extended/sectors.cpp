@@ -46,9 +46,8 @@ UINT64 SectorManager::GetSectorAmount(const size_t alignedSize) {
 
 
 bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
-	node.SectorsMutex.lock();
+	std::unique_lock writeLock(node.SectorsMutex);
 	const SIZE_T vectorSize = node.Sectors.size();
-	node.SectorsMutex.unlock();
 
 	const SIZE_T oldSize = vectorSize * FULL_SECTOR_SIZE;
 	const SIZE_T alignedSize = AlignSize(size);
@@ -57,19 +56,17 @@ bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
 	if (vectorSize < wantedSectorCount) {
 		// Allocate
 		const SIZE_T sectorDifference = wantedSectorCount - vectorSize;
-		InterlockedExchangeAdd(&this->allocatedSectors, sectorDifference); // TODO: Check if thread-safe
+		InterlockedExchangeAdd(&this->allocatedSectors, sectorDifference);
 
-		node.SectorsMutex.lock();
 		try {
 			node.Sectors.resize(wantedSectorCount);
-			node.SectorsMutex.unlock();
 		} catch (std::bad_alloc&) {
-			node.SectorsMutex.unlock();
-
 			// Deallocate again to old size after failed allocation
 			if (oldSize < vectorSize) {
+				writeLock.unlock();
 				this->ReAllocate(node, oldSize);
 			}
+
 			return false;
 		}
 
@@ -85,6 +82,7 @@ bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
 			} catch (std::bad_alloc&) {
 				// Deallocate again to old size after failed allocation
 				if (oldSize < vectorSize) {
+					writeLock.unlock();
 					this->ReAllocate(node, oldSize);
 				}
 
@@ -97,11 +95,9 @@ bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
 			HeapFree(this->heap, 0, node.Sectors[i]);
 		}
 
-		node.SectorsMutex.lock();
 		node.Sectors.resize(wantedSectorCount);
 		const UINT64 sectorDifference = vectorSize - wantedSectorCount;
 		InterlockedExchangeSubtract(&this->allocatedSectors, sectorDifference);
-		node.SectorsMutex.unlock();
 	}
 
 	return true;
@@ -125,9 +121,8 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 		return true;
 	}
 
-	node.SectorsMutex.lock();
+	std::shared_lock readLock(node.SectorsMutex);
 	const SIZE_T sectorCount = node.Sectors.size();
-	node.SectorsMutex.unlock();
 
 	const SIZE_T downAlignedOffset = AlignSize(offset, FALSE);
 	const UINT64 offsetSectorBegin = GetSectorAmount(downAlignedOffset);
@@ -135,7 +130,7 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 
 	UINT64 sectorEnd = offsetSectorBegin + GetSectorAmount(AlignSize(size)) - 1;
 	if (offsetOffset > 0) {  // TODO: FIX OFF BY ONE SECTOREND
-		sectorEnd++; // Needs to read one more sector to account for the bytes from the first sector to receive the full length
+		// sectorEnd++; // Needs to read one more sector to account for the bytes from the first sector to receive the full length
 	}
 
 	if (offsetSectorBegin >= sectorCount || sectorEnd > sectorCount || offsetOffset > FULL_SECTOR_SIZE) {

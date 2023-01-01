@@ -59,7 +59,11 @@ public:
 	}
 
 	[[nodiscard]] bool HoldsStruct() const {
-		return this->data_;
+		if (this->data_) {
+			return true;
+		}
+
+		return false;
 	}
 
 private:

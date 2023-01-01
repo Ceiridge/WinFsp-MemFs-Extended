@@ -14,7 +14,7 @@ namespace Memfs {
 
 	struct SectorNode {
 		SectorVector Sectors;
-		std::mutex SectorsMutex;
+		std::shared_mutex SectorsMutex;
 
 		SectorNode() = default;
 		// This must free all sectors on destruction!
