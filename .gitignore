@@ -363,4 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Generated installer
-Memefs.exe
+Memefs-Installer.exe

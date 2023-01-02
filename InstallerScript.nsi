@@ -3,7 +3,7 @@
 
 Name "Memefs"
 !define INSTALLATIONNAME "Memefs"
-OutFile "Memefs.exe"
+OutFile "Memefs-Installer.exe"
 
 !define FILE_SOURCE "x64\Release"
 InstallDir $PROGRAMFILES64\memefs
