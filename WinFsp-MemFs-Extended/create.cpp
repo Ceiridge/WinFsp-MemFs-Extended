@@ -109,7 +109,7 @@ MemFs::~MemFs() {
 void MemFs::Destroy() {
 	if (this->fileSystem) {
 		FspFileSystemDelete(this->fileSystem.get());
-		this->fileSystem = nullptr;
+		this->fileSystem.release();
 	}
 }
 
