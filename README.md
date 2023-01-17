@@ -13,7 +13,7 @@
 ![File I/O Speeds](benchmarks/filespeeds.avif) \
 As you can see, the unpreallocated file write times make the original memfs unusable, especially for web downloads. But if you need maximum sequential speed and are able to preallocate the file with NtCreateFile and its AllocationSize, then you should use the original memfs.
 ![Fsbench](benchmarks/fsbench.avif)
-**The fsbench results above are outdated** and the rewritten version is faster in most cases, sometimes significantly
+**The fsbench results above are outdated** and memefs (this repository) is faster in most cases, sometimes significantly.
 
 ## CLI
 ```

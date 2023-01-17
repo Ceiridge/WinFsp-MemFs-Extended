@@ -104,6 +104,10 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 
 MemFs::~MemFs() {
 	this->Destroy();
+	
+	if (MEMFS_SINGLETON == this) {
+		MEMFS_SINGLETON = nullptr;
+	}
 }
 
 void MemFs::Destroy() {
