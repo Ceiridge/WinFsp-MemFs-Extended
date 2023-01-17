@@ -138,7 +138,7 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 	}
 
 	SIZE_T byteAmount = min(size, FULL_SECTOR_SIZE - offsetOffset);
-	if (IsReading) {
+	if constexpr (IsReading) {
 		memcpy(buffer, node.Sectors[offsetSectorBegin]->Bytes + offsetOffset, byteAmount);
 	} else {
 		memcpy(node.Sectors[offsetSectorBegin]->Bytes + offsetOffset, buffer, byteAmount);
@@ -147,7 +147,7 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 	for (UINT64 i = offsetSectorBegin + 1; i <= sectorEnd; i++) {
 		const SIZE_T copyNow = min(FULL_SECTOR_SIZE, size - byteAmount);
 
-		if (IsReading) {
+		if constexpr (IsReading) {
 			memcpy((PVOID)((ULONG_PTR)buffer + byteAmount), node.Sectors[i]->Bytes, copyNow);
 		} else {
 			memcpy(node.Sectors[i]->Bytes, (PVOID)((ULONG_PTR)buffer + byteAmount), copyNow);
@@ -159,12 +159,10 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 	return true;
 }
 
-// Not actually used anywhere
-void ForceTemplateFunctionGenerationHelper() {
-	SectorNode& nothing = *static_cast<SectorNode*>(nullptr);
-	SectorManager::ReadWrite<true>(nothing, nullptr, 0, 0);
-	SectorManager::ReadWrite<false>(nothing, nullptr, 0, 0);
-}
+// Explicitly generate the template functions
+template bool SectorManager::ReadWrite<true>(SectorNode& node, void* buffer, const size_t size, const size_t offset);
+template bool SectorManager::ReadWrite<false>(SectorNode& node, void* buffer, const size_t size, const size_t offset);
+
 
 SectorNode::~SectorNode() {
 	SectorManager& sectorManager = MEMFS_SINGLETON->GetSectorManager();
