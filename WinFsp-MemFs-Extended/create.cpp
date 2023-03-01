@@ -38,7 +38,7 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	volumeParams.SectorsPerAllocationUnit = MEMFS_SECTORS_PER_ALLOCATION_UNIT;
 	volumeParams.VolumeCreationTime = Utils::GetSystemTime();
 	volumeParams.VolumeSerialNumber = static_cast<UINT32>(Utils::GetSystemTime() / (1010000ULL * 1000ULL));
-	volumeParams.FileInfoTimeout = -1; // Use cache manager
+	volumeParams.FileInfoTimeout = 15000; // Use cache manager; Timeout is in milliseconds
 	volumeParams.CaseSensitiveSearch = !caseInsensitive;
 	volumeParams.CasePreservedNames = true;
 	volumeParams.UnicodeOnDisk = true;
