@@ -8,7 +8,7 @@ If you want Memfs to automatically start when you boot / log into your account, 
 	1.5. Add a new action with the following settings:
 	```
 	Program/Script: "C:\Program Files (x86)\WinFsp\bin\launchctl-x64.exe"
-	Arguments: start memefs64 ramdisk "" \\.\R:
+	Arguments: start Memefs ramdisk "" \\.\R:
 	```
 	1.6. Optionally disable *Only run if the computer is connected to a power supply* in the task settings
 	1.7. Save, run and test
