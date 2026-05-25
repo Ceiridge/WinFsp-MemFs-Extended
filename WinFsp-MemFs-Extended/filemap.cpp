@@ -106,7 +106,7 @@ void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
 	}
 
 	this->TouchParent(node);
-	node.Dereference(true);
+	node.Dereference();
 }
 
 std::vector<FileNode*> MemFs::EnumerateNamedStreams(const FileNode& node, const bool references) {

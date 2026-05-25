@@ -26,7 +26,7 @@ namespace Memfs {
 
 		long GetReferenceCount(const bool withInterlock = true);
 		void Reference();
-		void Dereference(bool toZero = false);
+		void Dereference();
 
 		void CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const;
 

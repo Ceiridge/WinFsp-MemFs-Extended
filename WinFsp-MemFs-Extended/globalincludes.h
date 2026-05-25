@@ -26,7 +26,7 @@ namespace std {
 namespace Memfs {
 	static constexpr int MEMFS_MAX_PATH = 32766;
 	static constexpr UINT64 MEMFS_SECTOR_SIZE = 512;
-	static constexpr UINT64 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 1;
+	static constexpr UINT64 MEMFS_SECTORS_PER_ALLOCATION_UNIT = 128; // 64 KB allocation unit — matches VirtualAlloc granularity
 
 	static constexpr size_t FULL_SECTOR_SIZE = MEMFS_SECTOR_SIZE * MEMFS_SECTORS_PER_ALLOCATION_UNIT;
 

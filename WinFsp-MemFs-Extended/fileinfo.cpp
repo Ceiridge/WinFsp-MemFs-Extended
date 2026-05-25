@@ -95,7 +95,7 @@ namespace Memfs::Interface {
 
 			newFileNode.Reference();
 			memfs->RemoveNode(newFileNode);
-			newFileNode.Dereference(true);
+			newFileNode.Dereference();
 		}
 
 		// Rename descendants

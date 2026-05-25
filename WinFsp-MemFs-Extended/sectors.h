@@ -30,13 +30,13 @@ namespace Memfs {
 
 	class SectorManager {
 	public:
-		SectorManager();
-		~SectorManager();
+		SectorManager() = default;
+		~SectorManager() = default;
 
 		SectorManager(const SectorManager& other) = delete;
-		SectorManager(SectorManager&& other) noexcept;
+		SectorManager(SectorManager&& other) noexcept = default;
 		SectorManager& operator=(const SectorManager& other) = delete;
-		SectorManager& operator=(SectorManager&& other) noexcept;
+		SectorManager& operator=(SectorManager&& other) noexcept = default;
 
 		static size_t AlignSize(const size_t size, const bool alignUp = true);
 		static UINT64 GetSectorAmount(const size_t alignedSize);
@@ -50,7 +50,6 @@ namespace Memfs {
 		bool IsFullyEmpty();
 		UINT64 GetAllocatedSectors();
 	private:
-		HANDLE heap;
 		volatile UINT64 allocatedSectors{0};
 	};
 }

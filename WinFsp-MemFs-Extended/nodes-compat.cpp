@@ -26,7 +26,8 @@ namespace Memfs {
 			if (fileNode->fileInfo.AllocationSize != newSize) {
 				// memefs: Sector Reallocate
 				const SIZE_T oldSize = fileNode->GetSectorNode().ApproximateSize();
-				if (newSize - oldSize + memfs->GetUsedTotalSize() > memfs->CalculateMaxTotalSize()) {
+				if (newSize > oldSize &&
+					(newSize - oldSize) + memfs->GetUsedTotalSize() > memfs->CalculateMaxTotalSize()) {
 					return STATUS_DISK_FULL;
 				}
 

@@ -5,32 +5,6 @@
 
 using namespace Memfs;
 
-SectorManager::SectorManager() {
-	this->heap = HeapCreate(0, 0, 0);
-
-	if (this->heap == nullptr || this->heap == INVALID_HANDLE_VALUE) {
-		throw std::runtime_error("Could not create heap");
-	}
-}
-
-SectorManager::~SectorManager() {
-	HeapDestroy(this->heap); // Ignore errors
-}
-
-SectorManager::SectorManager(SectorManager&& other) noexcept : heap(std::move(other.heap)), allocatedSectors(other.allocatedSectors) {
-	other.heap = nullptr;
-}
-
-SectorManager& SectorManager::operator=(SectorManager&& other) noexcept {
-	HeapDestroy(this->heap);
-
-	this->heap = other.heap;
-	other.heap = nullptr;
-	this->allocatedSectors = other.allocatedSectors;
-
-	return *this;
-}
-
 size_t SectorManager::AlignSize(const size_t size, const bool alignUp) {
 	const size_t remainder = size % FULL_SECTOR_SIZE;
 	if (remainder == 0) {
@@ -61,38 +35,31 @@ bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
 		try {
 			node.Sectors.resize(wantedSectorCount);
 		} catch (std::bad_alloc&) {
-			// Deallocate again to old size after failed allocation
-			if (oldSize < vectorSize) {
-				writeLock.unlock();
-				this->ReAllocate(node, oldSize);
-			}
+			// always rollback on failure
+			writeLock.unlock();
+			this->ReAllocate(node, oldSize);
 
 			return false;
 		}
 
 
 		for (UINT64 i = vectorSize; i < wantedSectorCount; i++) {
-			try {
-				Sector* allocPtr = static_cast<Sector*>(HeapAlloc(this->heap, 0, sizeof(Sector)));
-				if (allocPtr == nullptr) {
-					throw std::bad_alloc();
-				}
-
-				node.Sectors[i] = allocPtr;
-			} catch (std::bad_alloc&) {
-				// Deallocate again to old size after failed allocation
-				if (oldSize < vectorSize) {
-					writeLock.unlock();
-					this->ReAllocate(node, oldSize);
-				}
+			// VirtualAlloc instead of HeapAlloc — VirtualFree(MEM_RELEASE) is instant and does not require paging in evicted pages, unlike HeapFree.
+			Sector* allocPtr = static_cast<Sector*>(VirtualAlloc(nullptr, sizeof(Sector), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+			if (allocPtr == nullptr) {
+				// always rollback on failure
+				writeLock.unlock();
+				this->ReAllocate(node, oldSize);
 
 				return false;
 			}
+
+			node.Sectors[i] = allocPtr;
 		}
 	} else if (vectorSize > wantedSectorCount) {
 		// Deallocate
 		for (UINT64 i = wantedSectorCount; i < vectorSize; i++) {
-			HeapFree(this->heap, 0, node.Sectors[i]);
+			VirtualFree(node.Sectors[i], 0, MEM_RELEASE);
 		}
 
 		node.Sectors.resize(wantedSectorCount);
@@ -133,7 +100,7 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 		sectorEnd++; // Needs to read one more sector to account for the bytes from the first sector to receive the full length
 	}
 
-	if (offsetSectorBegin >= sectorCount || sectorEnd > sectorCount || offsetOffset > FULL_SECTOR_SIZE) {
+	if (offsetSectorBegin >= sectorCount || sectorEnd >= sectorCount || offsetOffset > FULL_SECTOR_SIZE) {
 		return false;
 	}
 

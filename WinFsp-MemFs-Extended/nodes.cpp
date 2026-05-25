@@ -7,7 +7,7 @@
 
 using namespace Memfs;
 
-static volatile UINT64 IndexNumber = 1;
+static std::atomic<UINT64> IndexNumber{1};
 static constexpr bool LOG_REFERENCES = false; // Debug option
 
 FileNode::FileNode(const std::wstring& fileName) : fileName(fileName) {
@@ -19,7 +19,7 @@ FileNode::FileNode(const std::wstring& fileName) : fileName(fileName) {
 		this->fileInfo.LastWriteTime =
 		this->fileInfo.ChangeTime = now;
 
-	this->fileInfo.IndexNumber = IndexNumber++;
+	this->fileInfo.IndexNumber = IndexNumber.fetch_add(1, std::memory_order_relaxed);
 }
 
 void FileNode::EnsureFileNameLength() const {
@@ -44,27 +44,19 @@ void FileNode::Reference() {
 	}
 }
 
-void FileNode::Dereference(const bool toZero) {
-	volatile long newRefCount;
-
-	// Disabled due to it not working at all
-	if (toZero && false) {
-		InterlockedExchange(&this->refCount, 0ULL);
-		newRefCount = 0ULL;
-	} else {
-		newRefCount = InterlockedDecrement(&this->refCount);
-	}
+void FileNode::Dereference() {
+	const long newRefCount = InterlockedDecrement(&this->refCount);
 
 	if (LOG_REFERENCES) {
 		FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"-%d for %s", newRefCount, this->fileName.c_str());
 	}
 
-	if (newRefCount == 0ULL) {
+	if (newRefCount == 0) {
 		if (LOG_REFERENCES) {
 			FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"Removing %s", this->fileName.c_str());
 		}
 
-		delete this; // This better not cause any problems
+		delete this;
 	}
 }
 
