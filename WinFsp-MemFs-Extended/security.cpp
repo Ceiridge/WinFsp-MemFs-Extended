@@ -30,6 +30,8 @@ namespace Memfs::Interface {
 			fileNode = fileNode->GetMainNode();
 		}
 
+		std::shared_lock lock(fileNode->nodeMutex);
+
 		if (pFileAttributes != nullptr) {
 			*pFileAttributes = fileNode->fileInfo.FileAttributes & fileAttributesMask;
 		}

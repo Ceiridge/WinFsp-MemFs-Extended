@@ -55,6 +55,7 @@ void MemFs::TouchParent(const FileNode& node) {
 	if (snd.has_value()) {
 		FileNode& parent = snd.value();
 
+		std::unique_lock lock(parent.nodeMutex);
 		parent.fileInfo.LastAccessTime = parent.fileInfo.LastWriteTime = parent.fileInfo.ChangeTime = Utils::GetSystemTime();
 	}
 }
@@ -94,14 +95,21 @@ bool MemFs::HasChild(const FileNode& node) {
 
 std::pair<NTSTATUS, FileNode*> MemFs::InsertNode(FileNode* node) {
 	try {
-		const auto [iter, success] = this->fileMap.emplace(node->fileName, node);
-
-		if (success) {
-			iter->second->Reference();
-			this->TouchParent(*iter->second);
+		FileNode* resultNode;
+		bool didInsert;
+		{
+			std::unique_lock mapLock(this->fileMapMutex);
+			const auto [iter, success] = this->fileMap.emplace(node->fileName, node);
+			resultNode = iter->second;
+			didInsert = success;
+			if (success) {
+				iter->second->Reference();
+			}
 		}
-
-		return {STATUS_SUCCESS, iter->second};
+		if (didInsert) {
+			this->TouchParent(*resultNode);
+		}
+		return {STATUS_SUCCESS, resultNode};
 	} catch (...) {
 		return {STATUS_INSUFFICIENT_RESOURCES, node};
 	}
@@ -110,14 +118,22 @@ std::pair<NTSTATUS, FileNode*> MemFs::InsertNode(FileNode* node) {
 std::pair<NTSTATUS, FileNode&> MemFs::InsertNode(FileNode&& node) {
 	FileNode* allocatedNode{new FileNode(std::move(node))};
 	const auto [status, ptr] = this->InsertNode(allocatedNode);
+	if (!NT_SUCCESS(status)) {
+		// emplace threw std::bad_alloc — unrecoverable for an in-memory filesystem
+		delete allocatedNode;
+		FspDebugLog(__FUNCTION__ ": cannot insert into FileNodeMap; aborting\n");
+		abort();
+	}
 	return {status, *ptr};
 }
 
 void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
-	if (!this->fileMap.erase(node.fileName)) {
-		return;
+	{
+		std::unique_lock mapLock(this->fileMapMutex);
+		if (!this->fileMap.erase(node.fileName)) {
+			return;
+		}
 	}
-
 	this->TouchParent(node);
 	node.Dereference();
 }

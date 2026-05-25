@@ -197,6 +197,8 @@ namespace Memfs::Interface {
 			if (2 >= refCount) {
 				memfs->RemoveNode(*namedStream);
 			}
+
+			namedStream->Dereference(); // Release the reference added by EnumerateNamedStreams
 		}
 
 		std::unique_lock lock(fileNode->nodeMutex);

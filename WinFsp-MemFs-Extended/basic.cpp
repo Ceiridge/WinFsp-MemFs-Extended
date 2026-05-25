@@ -28,3 +28,7 @@ SectorManager& MemFs::GetSectorManager() {
 void MemFs::RecreateSectorManager() {
 	this->sectors = SectorManager();
 }
+
+std::shared_mutex& MemFs::GetFileMapMutex() {
+	return this->fileMapMutex;
+}

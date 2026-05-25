@@ -67,7 +67,6 @@ void FileNode::Dereference() {
 		if (LOG_REFERENCES) {
 			FspServiceLog(EVENTLOG_INFORMATION_TYPE, (PWSTR)L"Removing %s", this->fileName.c_str());
 		}
-
 		delete this;
 	}
 }
@@ -77,7 +76,9 @@ void FileNode::CopyFileInfo(FSP_FSCTL_FILE_INFO* fileInfoDest) const {
 		*fileInfoDest = this->fileInfo;
 	} else {
 		const auto mainFile = this->mainFileNode;
+		std::shared_lock mainLock(mainFile->nodeMutex);
 		*fileInfoDest = mainFile->fileInfo;
+		mainLock.unlock();
 
 		fileInfoDest->FileAttributes &= ~FILE_ATTRIBUTE_DIRECTORY;
 		/* named streams cannot be directories */

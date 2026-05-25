@@ -51,6 +51,8 @@ namespace Memfs {
 		SectorManager& GetSectorManager();
 		void RecreateSectorManager();
 
+		std::shared_mutex& GetFileMapMutex();
+
 		[[nodiscard]] bool IsCaseInsensitive() const;
 		std::refoptional<FileNode> FindFile(const std::wstring_view& fileName);
 		std::optional<FileNode*> FindMainFromStream(const std::wstring_view& fileName);
@@ -77,6 +79,7 @@ namespace Memfs {
 
 		SectorManager sectors;
 		FileNodeMap fileMap;
+		std::shared_mutex fileMapMutex;
 	};
 
 	inline MemFs* MEMFS_SINGLETON;

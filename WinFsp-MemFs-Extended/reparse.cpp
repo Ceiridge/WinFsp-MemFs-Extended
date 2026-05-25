@@ -44,8 +44,11 @@ namespace Memfs::Interface {
 			fileNode = fileNode->GetMainNode();
 		}
 
-		if (memfs->HasChild(*fileNode)) {
-			return STATUS_DIRECTORY_NOT_EMPTY;
+		{
+			std::shared_lock mapLock(memfs->GetFileMapMutex());
+			if (memfs->HasChild(*fileNode)) {
+				return STATUS_DIRECTORY_NOT_EMPTY;
+			}
 		}
 
 		std::unique_lock lock(fileNode->nodeMutex);

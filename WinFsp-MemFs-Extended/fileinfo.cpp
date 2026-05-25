@@ -106,8 +106,11 @@ namespace Memfs::Interface {
 		for (const auto& descendant : descendants) {
 			memfs->RemoveNode(*descendant, false);
 
-			std::wstring oldFileNameDesc = descendant->fileName;
-			descendant->fileName = newFileName + oldFileNameDesc.substr(fileNameLen);
+			{
+				std::unique_lock descLock(descendant->nodeMutex);
+				std::wstring oldFileNameDesc = descendant->fileName;
+				descendant->fileName = newFileName + oldFileNameDesc.substr(fileNameLen);
+			}
 
 			const auto [result,_] = memfs->InsertNode(descendant);
 			if (!NT_SUCCESS(result)) {
