@@ -19,8 +19,8 @@ UINT64 SectorManager::GetSectorAmount(const size_t alignedSize) {
 }
 
 
+// Caller takes care of locking
 bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
-	std::unique_lock writeLock(node.SectorsMutex);
 	const SIZE_T vectorSize = node.Sectors.size();
 
 	const SIZE_T oldSize = vectorSize * FULL_SECTOR_SIZE;
@@ -35,22 +35,15 @@ bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
 		try {
 			node.Sectors.resize(wantedSectorCount);
 		} catch (std::bad_alloc&) {
-			// always rollback on failure
-			writeLock.unlock();
 			this->ReAllocate(node, oldSize);
-
 			return false;
 		}
-
 
 		for (UINT64 i = vectorSize; i < wantedSectorCount; i++) {
 			// VirtualAlloc instead of HeapAlloc — VirtualFree(MEM_RELEASE) is instant and does not require paging in evicted pages, unlike HeapFree.
 			Sector* allocPtr = static_cast<Sector*>(VirtualAlloc(nullptr, sizeof(Sector), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
 			if (allocPtr == nullptr) {
-				// always rollback on failure
-				writeLock.unlock();
 				this->ReAllocate(node, oldSize);
-
 				return false;
 			}
 
@@ -88,7 +81,6 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 		return true;
 	}
 
-	std::shared_lock readLock(node.SectorsMutex);
 	const SIZE_T sectorCount = node.Sectors.size();
 
 	const SIZE_T downAlignedOffset = AlignSize(offset, FALSE);

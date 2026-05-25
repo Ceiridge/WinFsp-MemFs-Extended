@@ -21,8 +21,9 @@ namespace Memfs {
 		~FileNode() = default;
 		explicit FileNode(const FileNode& other) = delete;
 		FileNode& operator=(const FileNode& other) = delete;
-		explicit FileNode(FileNode&& other) noexcept = default;
-		FileNode& operator=(FileNode&& other) noexcept = default;
+		// std::shared_mutex is not movable; move constructor defined in nodes.cpp
+		explicit FileNode(FileNode&& other) noexcept;
+		FileNode& operator=(FileNode&& other) noexcept = delete;
 
 		long GetReferenceCount(const bool withInterlock = true);
 		void Reference();
@@ -42,8 +43,10 @@ namespace Memfs {
 
 		SectorNode& GetSectorNode();
 
+		mutable std::shared_mutex nodeMutex;
+
 	private:
-		// Don't forget to update the move constructor if adding new variables here
+		// Keep the manual move constructor in nodes.cpp in sync when adding members here
 		void EnsureFileNameLength() const; // Constrains filename with exceptions
 
 		SectorNode sectors;

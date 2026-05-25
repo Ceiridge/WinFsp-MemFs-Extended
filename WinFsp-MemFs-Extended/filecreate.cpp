@@ -199,6 +199,8 @@ namespace Memfs::Interface {
 			}
 		}
 
+		std::unique_lock lock(fileNode->nodeMutex);
+
 		fileNode->DeleteEaMap();
 		if (ea != nullptr) {
 			result = FspFileSystemEnumerateEa(fileSystem, CompatFspFileNodeSetEa, fileNode, ea, eaLength);

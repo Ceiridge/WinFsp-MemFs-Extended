@@ -3,6 +3,7 @@
 namespace Memfs::Interface {
 	NTSTATUS GetFileInfo(FSP_FILE_SYSTEM* fileSystem, PVOID fileNode0, FSP_FSCTL_FILE_INFO* fileInfo) {
 		const FileNode* fileNode = GetFileNode(fileNode0);
+		std::shared_lock lock(fileNode->nodeMutex);
 		fileNode->CopyFileInfo(fileInfo);
 		return STATUS_SUCCESS;
 	}
@@ -15,6 +16,8 @@ namespace Memfs::Interface {
 		if (!fileNode->IsMainNode()) {
 			fileNode = fileNode->GetMainNode();
 		}
+
+		std::unique_lock lock(fileNode->nodeMutex);
 
 		if (INVALID_FILE_ATTRIBUTES != fileAttributes) {
 			fileNode->fileInfo.FileAttributes = fileAttributes;
@@ -41,6 +44,7 @@ namespace Memfs::Interface {
 	                     FSP_FSCTL_FILE_INFO* fileInfo) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 
+		std::unique_lock lock(fileNode->nodeMutex);
 		const NTSTATUS result = CompatSetFileSizeInternal(fileSystem, fileNode, newSize, setAllocationSize);
 		if (!NT_SUCCESS(result)) {
 			return result;

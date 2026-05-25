@@ -18,6 +18,10 @@ namespace Memfs::Interface {
 
 		assert(0 != flags); /* FSP_FSCTL_VOLUME_PARAMS::PostCleanupWhenModifiedOnly ensures this */
 
+		// Lock both nodes if this is a named stream (fileNode != mainFileNode) so that
+		// allocation changes on the stream and metadata changes on the main file are atomic.
+		// std::scoped_lock handles deadlock avoidance automatically.
+		const auto doCleanup = [&]() {
 		if (flags & FspCleanupSetArchiveBit) {
 			if (0 == (mainFileNode->fileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
 				mainFileNode->fileInfo.FileAttributes |= FILE_ATTRIBUTE_ARCHIVE;
@@ -45,6 +49,15 @@ namespace Memfs::Interface {
 
 			CompatSetFileSizeInternal(fileSystem, fileNode, allocationSize, true);
 		}
+		};
+
+		if (fileNode != mainFileNode) {
+			std::scoped_lock lock(fileNode->nodeMutex, mainFileNode->nodeMutex);
+			doCleanup();
+		} else {
+			std::scoped_lock lock(fileNode->nodeMutex);
+			doCleanup();
+		}
 
 		if ((flags & FspCleanupDelete) && !memfs->HasChild(*fileNode)) {
 			for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
@@ -64,12 +77,15 @@ namespace Memfs::Interface {
 			fileNode = fileNode->GetMainNode();
 		}
 
-		if (0 == (fileNode->fileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-			!CompatAddStreamInfo(fileNode, buffer, length, pBytesTransferred))
-			return STATUS_SUCCESS;
+		{
+			std::shared_lock lock(fileNode->nodeMutex);
+			if (0 == (fileNode->fileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+				!CompatAddStreamInfo(fileNode, buffer, length, pBytesTransferred))
+				return STATUS_SUCCESS;
+		}
 
-		// I don't think this makes references
 		for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
+			std::shared_lock nsLock(namedStream->nodeMutex);
 			if (!CompatAddStreamInfo(namedStream, buffer, length, pBytesTransferred)) {
 				return STATUS_SUCCESS; // Without end
 			}

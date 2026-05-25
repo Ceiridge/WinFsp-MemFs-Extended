@@ -101,9 +101,12 @@ namespace Memfs::Utils {
 	}
 
 	BOOLEAN FileNameHasPrefix(const PCWSTR a, const PCWSTR b, const BOOLEAN caseInsensitive) {
-		int alen = (int)wcslen(a);
-		int blen = (int)wcslen(b);
+		const int alen = (int)wcslen(a);
+		const int blen = (int)wcslen(b);
+		return FileNameHasPrefix(a, alen, b, blen, caseInsensitive);
+	}
 
+	BOOLEAN FileNameHasPrefix(const PCWSTR a, int alen, const PCWSTR b, int blen, BOOLEAN caseInsensitive) {
 		return alen >= blen && 0 == FileNameCompare(a, blen, b, blen, caseInsensitive) &&
 		(alen == blen || (1 == blen && L'\\' == b[0]) ||
 			(L'\\' == a[blen] || L':' == a[blen]));

@@ -18,6 +18,8 @@ namespace Memfs::Interface {
 			fileNode = fileNode->GetMainNode();
 		}
 
+		std::shared_lock lock(fileNode->nodeMutex);
+
 		if (0 == (fileNode->fileInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
 			return STATUS_NOT_A_REPARSE_POINT;
 		}
@@ -45,6 +47,8 @@ namespace Memfs::Interface {
 		if (memfs->HasChild(*fileNode)) {
 			return STATUS_DIRECTORY_NOT_EMPTY;
 		}
+
+		std::unique_lock lock(fileNode->nodeMutex);
 
 		if (fileNode->reparseData.HoldsStruct()) {
 			const NTSTATUS result = FspFileSystemCanReplaceReparsePoint(
@@ -80,6 +84,8 @@ namespace Memfs::Interface {
 		if (!fileNode->IsMainNode()) {
 			fileNode = fileNode->GetMainNode();
 		}
+
+		std::unique_lock lock(fileNode->nodeMutex);
 
 		if (fileNode->reparseData.HoldsStruct()) {
 			const NTSTATUS result = FspFileSystemCanReplaceReparsePoint(

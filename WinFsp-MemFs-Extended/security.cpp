@@ -58,6 +58,8 @@ namespace Memfs::Interface {
 			fileNode = fileNode->GetMainNode();
 		}
 
+		std::shared_lock lock(fileNode->nodeMutex);
+
 		if (fileNode->fileSecurity.WantedByteSize() > *pSecurityDescriptorSize) {
 			*pSecurityDescriptorSize = fileNode->fileSecurity.WantedByteSize();
 			return STATUS_BUFFER_OVERFLOW;
@@ -80,6 +82,9 @@ namespace Memfs::Interface {
 		if (!fileNode->IsMainNode()) {
 			fileNode = fileNode->GetMainNode();
 		}
+
+		// FspSetSecurityDescriptor reads the OLD descriptor, then we replace it — hold lock for the whole operation
+		std::unique_lock lock(fileNode->nodeMutex);
 
 		NTSTATUS result = FspSetSecurityDescriptor(
 			fileNode->fileSecurity.Struct(),

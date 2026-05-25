@@ -5,6 +5,8 @@ namespace Memfs::Interface {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
 
+		std::shared_lock lock(fileNode->nodeMutex);
+
 		if (offset >= fileNode->fileInfo.FileSize) {
 			return STATUS_END_OF_FILE;
 		}
@@ -29,6 +31,8 @@ namespace Memfs::Interface {
 	                      PULONG pBytesTransferred, FSP_FSCTL_FILE_INFO* fileInfo) {
 		MemFs* memfs = GetMemFs(fileSystem);
 		FileNode* fileNode = GetFileNode(fileNode0);
+
+		std::unique_lock lock(fileNode->nodeMutex);
 
 		UINT64 endOffset;
 		NTSTATUS result;
@@ -68,6 +72,7 @@ namespace Memfs::Interface {
 		const FileNode* fileNode = GetFileNode(fileNode0);
 
 		if (fileNode != nullptr) {
+			std::shared_lock lock(fileNode->nodeMutex);
 			fileNode->CopyFileInfo(fileInfo);
 		}
 

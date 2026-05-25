@@ -75,6 +75,8 @@ namespace Memfs {
 			return STATUS_OBJECT_NAME_NOT_FOUND;
 		FileNode& fileNode = fileNodeOpt.value();
 
+		std::shared_lock lock(fileNode.nodeMutex);
+
 		if (0 == (fileNode.fileInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
 			return STATUS_NOT_A_REPARSE_POINT;
 
@@ -101,9 +103,13 @@ namespace Memfs {
 			fileNameStr = fileName;
 		}
 
-		memset(dirInfo->Padding, 0, sizeof dirInfo->Padding);
-		dirInfo->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + fileNameStr.length() * sizeof(WCHAR));
-		dirInfo->FileInfo = fileNode->fileInfo;
+		{
+			std::shared_lock lock(fileNode->nodeMutex);
+			memset(dirInfo->Padding, 0, sizeof dirInfo->Padding);
+			dirInfo->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + fileNameStr.length() * sizeof(WCHAR));
+			dirInfo->FileInfo = fileNode->fileInfo;
+		}
+
 		memcpy(dirInfo->FileNameBuf, fileNameStr.c_str(), dirInfo->Size - sizeof(FSP_FSCTL_DIR_INFO));
 
 		return FspFileSystemAddDirInfo(dirInfo, buffer, length, pBytesTransferred);

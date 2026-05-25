@@ -10,6 +10,18 @@ using namespace Memfs;
 static std::atomic<UINT64> IndexNumber{1};
 static constexpr bool LOG_REFERENCES = false; // Debug option
 
+FileNode::FileNode(FileNode&& other) noexcept
+	: fileName(std::move(other.fileName)),
+	  fileInfo(other.fileInfo),
+	  fileSecurity(std::move(other.fileSecurity)),
+	  reparseData(std::move(other.reparseData)),
+	  // nodeMutex is intentionally NOT moved — new object gets a fresh unlocked mutex
+	  sectors(std::move(other.sectors)),
+	  refCount(other.refCount),
+	  mainFileNode(other.mainFileNode),
+	  eaMap(std::move(other.eaMap)) {
+}
+
 FileNode::FileNode(const std::wstring& fileName) : fileName(fileName) {
 	this->EnsureFileNameLength();
 

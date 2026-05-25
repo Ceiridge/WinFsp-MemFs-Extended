@@ -8,6 +8,7 @@ namespace Memfs::Interface {
 	                      PFILE_FULL_EA_INFORMATION ea, ULONG eaLength, PULONG pBytesTransferred) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 
+		std::shared_lock lock(fileNode->nodeMutex);
 		const auto eaMapOpt = fileNode->GetEaMapOpt();
 		if (eaMapOpt.has_value()) {
 			const auto& eaMap = eaMapOpt.value().get();
@@ -29,6 +30,7 @@ namespace Memfs::Interface {
 	                      FSP_FSCTL_FILE_INFO* fileInfo) {
 		FileNode* fileNode = GetFileNode(fileNode0);
 
+		std::unique_lock lock(fileNode->nodeMutex);
 		const NTSTATUS result = FspFileSystemEnumerateEa(fileSystem, CompatFspFileNodeSetEa, fileNode, ea, eaLength);
 		if (!NT_SUCCESS(result)) {
 			return result;

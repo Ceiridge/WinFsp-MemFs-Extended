@@ -66,8 +66,12 @@ namespace Memfs::Interface {
 		const Utils::SuffixView suffixView = Utils::PathSuffix(fileNode.fileName);
 		fileNameStr = suffixView.Suffix;
 
-		dirInfo->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + fileNameStr.length() * sizeof(WCHAR));
-		dirInfo->FileInfo = fileNode.fileInfo;
+		{
+			std::shared_lock lock(fileNode.nodeMutex);
+			dirInfo->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + fileNameStr.length() * sizeof(WCHAR));
+			dirInfo->FileInfo = fileNode.fileInfo;
+		}
+
 		memcpy(dirInfo->FileNameBuf, fileNameStr.c_str(), dirInfo->Size - sizeof(FSP_FSCTL_DIR_INFO));
 
 		return STATUS_SUCCESS;

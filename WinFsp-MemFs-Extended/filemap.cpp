@@ -19,15 +19,11 @@ std::refoptional<FileNode> MemFs::FindFile(const std::wstring_view& fileName) {
 
 std::optional<FileNode*> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
 	const auto colonPos = std::ranges::find(fileName, L':');
-	std::wstring mainName;
+	const std::wstring_view mainNameView = (colonPos != fileName.end())
+		? std::wstring_view(fileName.data(), colonPos - fileName.begin())
+		: fileName;
 
-	if (colonPos != fileName.end()) {
-		mainName = std::wstring(fileName.data(), colonPos - fileName.begin());
-	} else {
-		mainName = fileName;
-	}
-
-	const auto iter = this->fileMap.find(mainName);
+	const auto iter = this->fileMap.find(mainNameView);
 	if (iter == this->fileMap.end()) {
 		return {};
 	}
@@ -64,19 +60,36 @@ void MemFs::TouchParent(const FileNode& node) {
 }
 
 bool MemFs::HasChild(const FileNode& node) {
-	bool result = false;
+	const size_t nodeLen = node.fileName.length();
+	const bool isRoot = (nodeLen == 1 && node.fileName[0] == L'\\');
 
 	for (auto iter = this->fileMap.upper_bound(node.fileName); this->fileMap.end() != iter; ++iter) {
-		if (iter->second->fileName.find(L':') != std::wstring::npos) {
+		const std::wstring& childName = iter->second->fileName;
+		const size_t childLen = childName.length();
+
+		// Skip named streams
+		if (childName.find(L':') != std::wstring::npos) {
 			continue;
 		}
 
-		const auto [remainPrefix, suffix] = Utils::PathSuffix(iter->second->fileName);
-		result = 0 == Utils::FileNameCompare(remainPrefix.data(), remainPrefix.length(), node.fileName.c_str(), node.fileName.length(), this->IsCaseInsensitive());
-		break;
+		// Check it is a direct child: prefix matches and no further separator after it
+		bool isChild;
+		if (isRoot) {
+			isChild = childLen > 1 &&
+			          childName.find(L'\\', 1) == std::wstring::npos;
+		} else {
+			isChild = childLen > nodeLen &&
+			          childName[nodeLen] == L'\\' &&
+			          childName.find(L'\\', nodeLen + 1) == std::wstring::npos;
+		}
+
+		if (isChild) {
+			return true;
+		}
+		break; // map is sorted; first entry after upper_bound is the closest match
 	}
 
-	return result;
+	return false;
 }
 
 std::pair<NTSTATUS, FileNode*> MemFs::InsertNode(FileNode* node) {
@@ -111,11 +124,12 @@ void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
 
 std::vector<FileNode*> MemFs::EnumerateNamedStreams(const FileNode& node, const bool references) {
 	std::vector<FileNode*> namedStreams;
+	const int nodeLen = (int)node.fileName.length();
 
 	for (auto iter = this->fileMap.upper_bound(node.fileName); this->fileMap.end() != iter; ++iter) {
-		if (!Utils::FileNameHasPrefix(iter->second->fileName.c_str(), node.fileName.c_str(), this->IsCaseInsensitive()))
+		if (!Utils::FileNameHasPrefix(iter->second->fileName.c_str(), (int)iter->second->fileName.length(), node.fileName.c_str(), nodeLen, this->IsCaseInsensitive()))
 			break;
-		if (L':' != iter->second->fileName[node.fileName.length()])
+		if (L':' != iter->second->fileName[nodeLen])
 			break;
 
 		if (references) {
@@ -129,9 +143,10 @@ std::vector<FileNode*> MemFs::EnumerateNamedStreams(const FileNode& node, const 
 
 std::vector<FileNode*> MemFs::EnumerateDescendants(const FileNode& node, const bool references) {
 	std::vector<FileNode*> descendants;
+	const int nodeLen = (int)node.fileName.length();
 
 	for (auto iter = this->fileMap.lower_bound(node.fileName); this->fileMap.end() != iter; ++iter) {
-		if (!Utils::FileNameHasPrefix(iter->second->fileName.c_str(), node.fileName.c_str(), this->IsCaseInsensitive()))
+		if (!Utils::FileNameHasPrefix(iter->second->fileName.c_str(), (int)iter->second->fileName.length(), node.fileName.c_str(), nodeLen, this->IsCaseInsensitive()))
 			break;
 
 		if (references) {
@@ -146,21 +161,41 @@ std::vector<FileNode*> MemFs::EnumerateDescendants(const FileNode& node, const b
 std::vector<FileNode*> MemFs::EnumerateDirChildren(const FileNode& node, const wchar_t* marker) {
 	std::vector<FileNode*> children;
 	FileNodeMap::iterator iter;
+	const size_t nodeLen = node.fileName.length();
+	const int nodeLenI = (int)nodeLen;
+	const bool isRoot = (nodeLen == 1 && node.fileName[0] == L'\\');
 
 	if (marker) {
-		const bool needsSlash = node.fileName.length() != 1 || node.fileName[0] != L'\\';
-		iter = this->fileMap.upper_bound(node.fileName + (needsSlash ? L"\\" : L"") + marker);
-	} else
+		const bool needsSlash = !isRoot;
+		std::wstring markerKey;
+		markerKey.reserve(nodeLen + 1 + wcslen(marker));
+		markerKey = node.fileName;
+		if (needsSlash) markerKey += L'\\';
+		markerKey += marker;
+		iter = this->fileMap.upper_bound(markerKey);
+	} else {
 		iter = this->fileMap.upper_bound(node.fileName);
+	}
 
 	for (; this->fileMap.end() != iter; ++iter) {
-		if (!Utils::FileNameHasPrefix(iter->second->fileName.c_str(), node.fileName.c_str(), this->IsCaseInsensitive()))
+		const std::wstring& childName = iter->second->fileName;
+		const size_t childLen = childName.length();
+
+		if (!Utils::FileNameHasPrefix(childName.c_str(), (int)childLen, node.fileName.c_str(), nodeLenI, this->IsCaseInsensitive()))
 			break;
 
-		const Utils::SuffixView suffixView = Utils::PathSuffix(iter->second->fileName);
-
-		bool isDirectoryChild = 0 == Utils::FileNameCompare(suffixView.RemainPrefix.data(), suffixView.RemainPrefix.length(), node.fileName.c_str(), node.fileName.length(), this->IsCaseInsensitive());
-		isDirectoryChild = isDirectoryChild && suffixView.Suffix.find(L':') == std::string::npos;
+		// Direct child: next char after prefix is '\', no further '\' or ':' after it
+		bool isDirectoryChild;
+		if (isRoot) {
+			isDirectoryChild = childLen > 1 &&
+			                   childName.find(L'\\', 1) == std::wstring::npos &&
+			                   childName.find(L':', 1) == std::wstring::npos;
+		} else {
+			isDirectoryChild = childLen > nodeLen &&
+			                   childName[nodeLen] == L'\\' &&
+			                   childName.find(L'\\', nodeLen + 1) == std::wstring::npos &&
+			                   childName.find(L':', nodeLen + 1) == std::wstring::npos;
+		}
 
 		if (isDirectoryChild) {
 			children.push_back(iter->second);

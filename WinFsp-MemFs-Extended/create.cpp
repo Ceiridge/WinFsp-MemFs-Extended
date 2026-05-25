@@ -76,6 +76,8 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	this->fileSystem = std::unique_ptr<FSP_FILE_SYSTEM>(fileSystemReceiver);
 	this->fileSystem->UserContext = this;
 
+	FspFileSystemSetOperationGuardStrategy(fileSystemReceiver, FSP_FILE_SYSTEM_OPERATION_GUARD_STRATEGY_FINE);
+
 	if (volumeLabel != nullptr) {
 		this->volumeLabel = volumeLabel;
 	}
