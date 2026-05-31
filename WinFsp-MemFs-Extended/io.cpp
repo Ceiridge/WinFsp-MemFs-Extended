@@ -39,6 +39,7 @@ namespace Memfs::Interface {
 
 		if (constrainedIo) {
 			if (offset >= fileNode->fileInfo.FileSize) {
+				*pBytesTransferred = 0;
 				return STATUS_SUCCESS;
 			}
 			endOffset = offset + length;
