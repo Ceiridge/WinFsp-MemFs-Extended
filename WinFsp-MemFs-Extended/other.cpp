@@ -59,12 +59,23 @@ namespace Memfs::Interface {
 			doCleanup();
 		}
 
-		if ((flags & FspCleanupDelete) && !memfs->HasChild(*fileNode)) {
-			for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
-				memfs->RemoveNode(*namedStream);
-			}
+		if (flags & FspCleanupDelete) {
+			// A4: HasChild/EnumerateNamedStreams/RemoveNode all work by name. If the name
+			// meanwhile belongs to a different node, they would operate on that node's children
+			// and streams instead of on this one's.
+			const auto currentOpt = memfs->FindFile(fileNode->fileName);
+			const bool stillLinked = currentOpt.has_value() && &currentOpt.value().get() == fileNode;
 
-			memfs->RemoveNode(*fileNode);
+			if (!stillLinked) {
+				memfs->diagCleanupDeleteUnlinked.fetch_add(1, std::memory_order_relaxed);
+				FspDebugLog(__FUNCTION__ ": cleanup-delete on a node that no longer owns its name\n");
+			} else if (!memfs->HasChild(*fileNode)) {
+				for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, false)) {
+					memfs->RemoveNode(*namedStream);
+				}
+
+				memfs->RemoveNode(*fileNode);
+			}
 		}
 	}
 

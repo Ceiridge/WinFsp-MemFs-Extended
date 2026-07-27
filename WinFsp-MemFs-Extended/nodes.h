@@ -9,6 +9,14 @@
 namespace Memfs {
 	using FileNodeEaMap = std::map<std::string, DynamicStruct<FILE_FULL_EA_INFORMATION>, Utils::EaLess>;
 
+#if MEMFS_DIAGNOSTICS
+	// D0 substitute (docs/MEMORY-SAFETY-AUDIT.md): gflags/PageHeap needs administrator rights,
+	// so instead every FileNode carries a liveness magic that its destructor clears. Touching a
+	// destroyed node through a stale pointer (findings A1, A2, B2, B4) is then counted instead
+	// of silently corrupting whatever the allocator handed the memory to.
+	inline std::atomic<uint64_t> DiagNodeUseAfterFree{0};
+#endif
+
 	class FileNode {
 	public:
 		std::wstring fileName; // Has to be constrained!
@@ -18,7 +26,7 @@ namespace Memfs {
 		DynamicStruct<byte> reparseData;
 
 		explicit FileNode(const std::wstring& fileName);
-		~FileNode() = default;
+		~FileNode();
 		explicit FileNode(const FileNode& other) = delete;
 		FileNode& operator=(const FileNode& other) = delete;
 		// std::shared_mutex is not movable; move constructor defined in nodes.cpp
@@ -48,6 +56,13 @@ namespace Memfs {
 	private:
 		// Keep the manual move constructor in nodes.cpp in sync when adding members here
 		void EnsureFileNameLength() const; // Constrains filename with exceptions
+
+#if MEMFS_DIAGNOSTICS
+		static constexpr uint32_t ALIVE_MAGIC = 0x4D454D46; // 'MEMF'
+		static constexpr uint32_t DEAD_MAGIC = 0xDEADF11E;
+		void DiagCheckAlive(const char* where) const;
+		uint32_t diagMagic{ALIVE_MAGIC};
+#endif
 
 		SectorNode sectors;
 		volatile long refCount{0};

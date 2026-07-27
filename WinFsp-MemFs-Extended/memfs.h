@@ -68,6 +68,30 @@ namespace Memfs {
 		std::vector<FileNode*> EnumerateDescendants(const FileNode& node, const bool references);
 		std::vector<FileNode*> EnumerateDirChildren(const FileNode& node, const wchar_t* marker);
 
+		// --- diagnostics (docs/MEMORY-SAFETY-AUDIT.md, step 1) -------------
+		// D1: how often RemoveNode was asked to unlink a name that meanwhile belongs to a
+		// different node. Always counted; a single hit proves finding A1.
+		std::atomic<uint64_t> diagWrongNameRemovals{0};
+		// A3: how often InsertNode(FileNode*) hit a name collision and returned a foreign node
+		// under STATUS_SUCCESS.
+		std::atomic<uint64_t> diagInsertCollisions{0};
+		// A4: how often Cleanup(FspCleanupDelete) ran on a node that is no longer the one the
+		// map holds under its name.
+		std::atomic<uint64_t> diagCleanupDeleteUnlinked{0};
+#if MEMFS_DIAGNOSTICS
+		// D2: fileMap write epoch, and how many lookups ran across a concurrent write.
+		std::atomic<uint64_t> diagMapEpoch{0};
+		std::atomic<uint64_t> diagLookups{0};
+		std::atomic<uint64_t> diagOverlappedLookups{0};
+		// How many unlocked lookups were in flight at the same time (max observed) — decides
+		// whether WinFsp's FINE guard strategy really lets namespace operations overlap.
+		std::atomic<long> diagLookupsInFlight{0};
+		std::atomic<long> diagMaxLookupsInFlight{0};
+		// Writers currently inside the fileMapMutex critical section.
+		std::atomic<long> diagWritersActive{0};
+#endif
+		void DiagReport();
+
 	private:
 		std::unique_ptr<FSP_FILE_SYSTEM> fileSystem;
 
@@ -83,4 +107,54 @@ namespace Memfs {
 	};
 
 	inline MemFs* MEMFS_SINGLETON;
+
+#if MEMFS_DIAGNOSTICS
+	// Samples the fileMap write epoch around an unlocked lookup. Two relaxed loads, no lock.
+	class LookupGuard {
+	public:
+		explicit LookupGuard(MemFs& memfs)
+			: memfs(memfs), before(memfs.diagMapEpoch.load()),
+			  writerSeen(memfs.diagWritersActive.load() != 0) {
+			const long inFlight = this->memfs.diagLookupsInFlight.fetch_add(1) + 1;
+			long observedMax = this->memfs.diagMaxLookupsInFlight.load();
+			while (inFlight > observedMax &&
+				!this->memfs.diagMaxLookupsInFlight.compare_exchange_weak(observedMax, inFlight)) {
+			}
+		}
+
+		~LookupGuard() {
+			this->memfs.diagLookupsInFlight.fetch_sub(1);
+			this->memfs.diagLookups.fetch_add(1, std::memory_order_relaxed);
+			if (this->memfs.diagMapEpoch.load() != this->before ||
+				this->writerSeen || this->memfs.diagWritersActive.load() != 0) {
+				this->memfs.diagOverlappedLookups.fetch_add(1, std::memory_order_relaxed);
+			}
+		}
+
+		LookupGuard(const LookupGuard&) = delete;
+		LookupGuard& operator=(const LookupGuard&) = delete;
+
+	private:
+		MemFs& memfs;
+		uint64_t before;
+		bool writerSeen;
+	};
+
+	// Marks the fileMapMutex critical section of InsertNode/RemoveNode.
+	class WriterGuard {
+	public:
+		explicit WriterGuard(MemFs& memfs) : memfs(memfs) { memfs.diagWritersActive.fetch_add(1); }
+		~WriterGuard() { this->memfs.diagWritersActive.fetch_sub(1); }
+
+		WriterGuard(const WriterGuard&) = delete;
+		WriterGuard& operator=(const WriterGuard&) = delete;
+
+	private:
+		MemFs& memfs;
+	};
+
+#define MEMFS_LOOKUP_GUARD() const Memfs::LookupGuard memfsLookupGuard_(*this)
+#else
+#define MEMFS_LOOKUP_GUARD() ((void)0)
+#endif
 }

@@ -27,7 +27,15 @@ public:
 		std::memcpy(data_.get(), other.data_.get(), this->ByteSize());
 	}
 
-	DynamicStruct(DynamicStruct&& other) noexcept = default;
+	// C3: the defaulted move operations left wantedSize_ behind in the source while data_ became
+	// null, so the moved-from object claimed WantedByteSize() > 0 with Struct() == nullptr. A
+	// read path hitting that violates memcpy_s' constraints — the invalid-parameter handler
+	// terminates the process by default, or zeroes the destination, producing a security
+	// descriptor with Revision == 0 (ERROR_UNKNOWN_REVISION).
+	DynamicStruct(DynamicStruct&& other) noexcept
+		: wantedSize_(other.wantedSize_), data_(std::move(other.data_)) {
+		other.wantedSize_ = 0;
+	}
 
 	DynamicStruct& operator=(const DynamicStruct& other) {
 		if (this != &other) {
@@ -39,7 +47,15 @@ public:
 		return *this;
 	}
 
-	DynamicStruct& operator=(DynamicStruct&& other) noexcept = default;
+	DynamicStruct& operator=(DynamicStruct&& other) noexcept {
+		if (this != &other) {
+			wantedSize_ = other.wantedSize_;
+			data_ = std::move(other.data_);
+			other.wantedSize_ = 0;
+		}
+
+		return *this;
+	}
 
 
 	T* Struct() {

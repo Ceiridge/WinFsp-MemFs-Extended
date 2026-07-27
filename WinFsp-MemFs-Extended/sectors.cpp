@@ -23,32 +23,34 @@ UINT64 SectorManager::GetSectorAmount(const size_t alignedSize) {
 bool SectorManager::ReAllocate(SectorNode& node, const size_t size) {
 	const SIZE_T vectorSize = node.Sectors.size();
 
-	const SIZE_T oldSize = vectorSize * FULL_SECTOR_SIZE;
 	const SIZE_T alignedSize = AlignSize(size);
 	const UINT64 wantedSectorCount = GetSectorAmount(alignedSize);
 
 	if (vectorSize < wantedSectorCount) {
-		// Allocate
-		const SIZE_T sectorDifference = wantedSectorCount - vectorSize;
-		InterlockedExchangeAdd(&this->allocatedSectors, sectorDifference);
-
+		// Allocate. C2: allocatedSectors is only raised once every sector really exists —
+		// counting up front and rolling back with ReAllocate(node, oldSize) was a no-op
+		// whenever the resize itself threw, so the reported fill level drifted upwards forever.
 		try {
-			node.Sectors.resize(wantedSectorCount);
+			node.Sectors.resize(wantedSectorCount); // new elements are value-initialised to nullptr
 		} catch (std::bad_alloc&) {
-			this->ReAllocate(node, oldSize);
-			return false;
+			return false; // vector unchanged, nothing was counted
 		}
 
 		for (UINT64 i = vectorSize; i < wantedSectorCount; i++) {
 			// VirtualAlloc instead of HeapAlloc — VirtualFree(MEM_RELEASE) is instant and does not require paging in evicted pages, unlike HeapFree.
 			Sector* allocPtr = static_cast<Sector*>(VirtualAlloc(nullptr, sizeof(Sector), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
 			if (allocPtr == nullptr) {
-				this->ReAllocate(node, oldSize);
+				for (UINT64 j = vectorSize; j < i; j++) {
+					VirtualFree(node.Sectors[j], 0, MEM_RELEASE);
+				}
+				node.Sectors.resize(vectorSize);
 				return false;
 			}
 
 			node.Sectors[i] = allocPtr;
 		}
+
+		InterlockedExchangeAdd(&this->allocatedSectors, wantedSectorCount - vectorSize);
 	} else if (vectorSize > wantedSectorCount) {
 		// Deallocate
 		for (UINT64 i = wantedSectorCount; i < vectorSize; i++) {
@@ -87,10 +89,10 @@ bool SectorManager::ReadWrite(SectorNode& node, void* buffer, const size_t size,
 	const UINT64 offsetSectorBegin = GetSectorAmount(downAlignedOffset);
 	const SIZE_T offsetOffset = offset - downAlignedOffset;
 
-	UINT64 sectorEnd = offsetSectorBegin + GetSectorAmount(AlignSize(size)) - 1;
-	if (offsetOffset > 0 && sectorCount > sectorEnd + 1) {
-		sectorEnd++; // Needs to read one more sector to account for the bytes from the first sector to receive the full length
-	}
+	// C8: derive the last sector from the last byte instead of from the aligned length. The old
+	// "add one more sector if there is room" only silently copied too little when the extra
+	// sector was missing, and still reported success.
+	const UINT64 sectorEnd = (offset + size - 1) / FULL_SECTOR_SIZE;
 
 	if (offsetSectorBegin >= sectorCount || sectorEnd >= sectorCount || offsetOffset > FULL_SECTOR_SIZE) {
 		return false;

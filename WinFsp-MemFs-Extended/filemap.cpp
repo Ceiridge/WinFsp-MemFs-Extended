@@ -9,6 +9,8 @@ bool MemFs::IsCaseInsensitive() const {
 }
 
 std::refoptional<FileNode> MemFs::FindFile(const std::wstring_view& fileName) {
+	MEMFS_LOOKUP_GUARD();
+
 	const auto iter = this->fileMap.find(fileName);
 	if (iter == this->fileMap.end()) {
 		return {};
@@ -18,6 +20,8 @@ std::refoptional<FileNode> MemFs::FindFile(const std::wstring_view& fileName) {
 }
 
 std::optional<FileNode*> MemFs::FindMainFromStream(const std::wstring_view& fileName) {
+	MEMFS_LOOKUP_GUARD();
+
 	const auto colonPos = std::ranges::find(fileName, L':');
 	const std::wstring_view mainNameView = (colonPos != fileName.end())
 		? std::wstring_view(fileName.data(), colonPos - fileName.begin())
@@ -32,6 +36,8 @@ std::optional<FileNode*> MemFs::FindMainFromStream(const std::wstring_view& file
 }
 
 std::pair<NTSTATUS, std::refoptional<FileNode>> MemFs::FindParent(const std::wstring_view& fileName) {
+	MEMFS_LOOKUP_GUARD();
+
 	const auto parentPath = Utils::PathSuffix(fileName).RemainPrefix;
 
 	const auto iter = this->fileMap.find(parentPath);
@@ -61,6 +67,8 @@ void MemFs::TouchParent(const FileNode& node) {
 }
 
 bool MemFs::HasChild(const FileNode& node) {
+	MEMFS_LOOKUP_GUARD();
+
 	const size_t nodeLen = node.fileName.length();
 	const bool isRoot = (nodeLen == 1 && node.fileName[0] == L'\\');
 
@@ -99,16 +107,29 @@ std::pair<NTSTATUS, FileNode*> MemFs::InsertNode(FileNode* node) {
 		bool didInsert;
 		{
 			std::unique_lock mapLock(this->fileMapMutex);
+#if MEMFS_DIAGNOSTICS
+			const WriterGuard writerGuard(*this);
+#endif
 			const auto [iter, success] = this->fileMap.emplace(node->fileName, node);
 			resultNode = iter->second;
 			didInsert = success;
-			if (success) {
+			if (!success) {
+				this->diagInsertCollisions.fetch_add(1, std::memory_order_relaxed);
+				FspDebugLog(__FUNCTION__ ": name collision - the name already belongs to another node\n");
+			} else {
 				iter->second->Reference();
+#if MEMFS_DIAGNOSTICS
+				this->diagMapEpoch.fetch_add(1);
+#endif
 			}
 		}
-		if (didInsert) {
-			this->TouchParent(*resultNode);
+		if (!didInsert) {
+			// A3: the name is taken by another node. Returning it under STATUS_SUCCESS would
+			// hand the caller a handle to the wrong file and leak the node it wanted to insert.
+			return {STATUS_OBJECT_NAME_COLLISION, resultNode};
 		}
+
+		this->TouchParent(*resultNode);
 		return {STATUS_SUCCESS, resultNode};
 	} catch (...) {
 		return {STATUS_INSUFFICIENT_RESOURCES, node};
@@ -118,24 +139,79 @@ std::pair<NTSTATUS, FileNode*> MemFs::InsertNode(FileNode* node) {
 std::pair<NTSTATUS, FileNode&> MemFs::InsertNode(FileNode&& node) {
 	FileNode* allocatedNode{new FileNode(std::move(node))};
 	const auto [status, ptr] = this->InsertNode(allocatedNode);
+
 	if (!NT_SUCCESS(status)) {
-		// emplace threw std::bad_alloc — unrecoverable for an in-memory filesystem
+		// The node never entered the map, so nothing else can reach it.
 		delete allocatedNode;
-		FspDebugLog(__FUNCTION__ ": cannot insert into FileNodeMap; aborting\n");
-		abort();
+
+		if (STATUS_OBJECT_NAME_COLLISION != status) {
+			// emplace threw std::bad_alloc — unrecoverable for an in-memory filesystem
+			FspDebugLog(__FUNCTION__ ": cannot insert into FileNodeMap; aborting\n");
+			abort();
+		}
+		// On a collision ptr is the *existing* node, which is still alive.
 	}
+
 	return {status, *ptr};
 }
 
 void MemFs::RemoveNode(FileNode& node, const bool reportDeletedSize) {
 	{
 		std::unique_lock mapLock(this->fileMapMutex);
-		if (!this->fileMap.erase(node.fileName)) {
+#if MEMFS_DIAGNOSTICS
+		const WriterGuard writerGuard(*this);
+#endif
+
+		const auto iter = this->fileMap.find(node.fileName);
+		if (iter == this->fileMap.end()) {
 			return;
 		}
+
+		// A1: the name may meanwhile belong to a *different* node — rename with
+		// replaceIfExists, POSIX unlink with handles still open. Erasing it would unlink the
+		// wrong entry and drop a reference this node never owned.
+		if (iter->second != &node) {
+			this->diagWrongNameRemovals.fetch_add(1, std::memory_order_relaxed);
+			FspDebugLog(__FUNCTION__ ": name belongs to a different node - not unlinking\n");
+			return;
+		}
+
+		this->fileMap.erase(iter);
+#if MEMFS_DIAGNOSTICS
+		this->diagMapEpoch.fetch_add(1, std::memory_order_relaxed);
+#endif
 	}
 	this->TouchParent(node);
 	node.Dereference();
+}
+
+void MemFs::DiagReport() {
+	// wvsprintf-based loggers: keep the format specifiers to what they understand.
+	const ULONG wrongName = (ULONG)this->diagWrongNameRemovals.load(std::memory_order_relaxed);
+	const ULONG collisions = (ULONG)this->diagInsertCollisions.load(std::memory_order_relaxed);
+	const ULONG unlinkedCleanups = (ULONG)this->diagCleanupDeleteUnlinked.load(std::memory_order_relaxed);
+	FspDebugLog("memefs diagnostics: A1 wrong-name removals = %lu, A3 insert collisions = %lu, "
+	            "A4 cleanup-delete on unlinked node = %lu\n", wrongName, collisions, unlinkedCleanups);
+	FspServiceLog((wrongName | collisions | unlinkedCleanups) != 0 ? EVENTLOG_ERROR_TYPE : EVENTLOG_INFORMATION_TYPE,
+	              (PWSTR)L"memefs diagnostics: A1 wrong-name removals = %lu, A3 insert collisions = %lu, "
+	              L"A4 cleanup-delete on unlinked node = %lu", wrongName, collisions, unlinkedCleanups);
+
+#if MEMFS_DIAGNOSTICS
+	const ULONG lookups = (ULONG)this->diagLookups.load(std::memory_order_relaxed);
+	const ULONG overlapped = (ULONG)this->diagOverlappedLookups.load(std::memory_order_relaxed);
+	const ULONG epoch = (ULONG)this->diagMapEpoch.load(std::memory_order_relaxed);
+	const ULONG useAfterFree = (ULONG)DiagNodeUseAfterFree.load(std::memory_order_relaxed);
+	FspDebugLog("memefs diagnostics: D0 uses of a destroyed FileNode = %lu\n", useAfterFree);
+	FspServiceLog(useAfterFree != 0 ? EVENTLOG_ERROR_TYPE : EVENTLOG_INFORMATION_TYPE,
+	              (PWSTR)L"memefs diagnostics: D0 uses of a destroyed FileNode = %lu", useAfterFree);
+
+	const ULONG maxInFlight = (ULONG)this->diagMaxLookupsInFlight.load();
+	FspDebugLog("memefs diagnostics: D2 map writes = %lu, lookups = %lu, overlapped with a map write = %lu, "
+	            "max concurrent lookups = %lu\n", epoch, lookups, overlapped, maxInFlight);
+	FspServiceLog(overlapped != 0 ? EVENTLOG_WARNING_TYPE : EVENTLOG_INFORMATION_TYPE,
+	              (PWSTR)L"memefs diagnostics: D2 map writes = %lu, lookups = %lu, overlapped = %lu",
+	              epoch, lookups, overlapped);
+#endif
 }
 
 std::vector<FileNode*> MemFs::EnumerateNamedStreams(const FileNode& node, const bool references) {
@@ -175,6 +251,8 @@ std::vector<FileNode*> MemFs::EnumerateDescendants(const FileNode& node, const b
 }
 
 std::vector<FileNode*> MemFs::EnumerateDirChildren(const FileNode& node, const wchar_t* marker) {
+	MEMFS_LOOKUP_GUARD();
+
 	std::vector<FileNode*> children;
 	FileNodeMap::iterator iter;
 	const size_t nodeLen = node.fileName.length();

@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <winfsp/winfsp.h>
 
+#include <atomic>
 #include <map>
 #include <memory>
 #include <optional>
@@ -15,6 +16,12 @@
 #include <cstdint>
 #include <cassert>
 #include <sddl.h>
+
+// Diagnostics counters for the memory-safety audit (docs/MEMORY-SAFETY-AUDIT.md, step 1).
+// Compiles away completely when 0; enable with /D MEMFS_DIAGNOSTICS=1.
+#ifndef MEMFS_DIAGNOSTICS
+#define MEMFS_DIAGNOSTICS 0
+#endif
 
 // Modifying std for convenience, although not recommended
 namespace std {

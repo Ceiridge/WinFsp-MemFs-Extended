@@ -92,9 +92,6 @@ namespace Memfs {
 	}
 
 	BOOLEAN CompatAddDirInfo(FileNode* fileNode, PCWSTR fileName, PVOID buffer, ULONG length, PULONG pBytesTransferred) {
-		DynamicStruct<FSP_FSCTL_DIR_INFO> dirInfoBuf(sizeof(FSP_FSCTL_DIR_INFO) + fileNode->fileName.size() * sizeof(std::wstring::value_type) + 1);
-		FSP_FSCTL_DIR_INFO* dirInfo = dirInfoBuf.Struct();
-
 		std::wstring fileNameStr;
 		if (fileName == nullptr) {
 			const Utils::SuffixView suffixView = Utils::PathSuffix(fileNode->fileName);
@@ -102,6 +99,13 @@ namespace Memfs {
 		} else {
 			fileNameStr = fileName;
 		}
+
+		// C7: size the buffer from the name that is actually copied. Sizing it from
+		// fileNode->fileName was too small whenever fileName is longer than the node's own
+		// suffix (L".." with the root as parent) and only fit because DynamicStruct rounds up.
+		DynamicStruct<FSP_FSCTL_DIR_INFO> dirInfoBuf(
+			sizeof(FSP_FSCTL_DIR_INFO) + fileNameStr.length() * sizeof(std::wstring::value_type));
+		FSP_FSCTL_DIR_INFO* dirInfo = dirInfoBuf.Struct();
 
 		{
 			std::shared_lock lock(fileNode->nodeMutex);

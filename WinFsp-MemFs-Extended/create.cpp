@@ -79,7 +79,9 @@ MemFs::MemFs(ULONG flags, UINT64 maxFsSize, const wchar_t* fileSystemName, const
 	FspFileSystemSetOperationGuardStrategy(fileSystemReceiver, FSP_FILE_SYSTEM_OPERATION_GUARD_STRATEGY_FINE);
 
 	if (volumeLabel != nullptr) {
-		this->volumeLabel = volumeLabel;
+		// C6: SetVolumeLabel clamps to MAX_VOLUME_LABEL_STR_LENGTH - 1. Assigning directly let a
+		// long -l argument produce a VolumeLabelLength beyond the WCHAR[32] of FSP_FSCTL_VOLUME_INFO.
+		this->SetVolumeLabel(volumeLabel);
 	}
 
 	// Create root directory.
@@ -114,6 +116,8 @@ MemFs::~MemFs() {
 
 void MemFs::Destroy() {
 	if (this->fileSystem) {
+		this->DiagReport();
+
 		FspFileSystemDelete(this->fileSystem.get());
 		this->fileSystem.release();
 	}

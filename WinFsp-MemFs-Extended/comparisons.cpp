@@ -39,7 +39,7 @@ namespace Memfs::Utils {
 				if (0 != v)
 					return v - 2;
 				else
-					return _wcsnicmp(s, t, n);
+					return _wcsnicmp(s0, t0, n); // C9: compare the whole run, not from the current position
 			}
 			if (0 != (v = UpperChar(sc) - UpperChar(tc)) || !tc)
 				break;

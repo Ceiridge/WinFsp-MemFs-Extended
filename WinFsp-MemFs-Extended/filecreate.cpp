@@ -74,7 +74,8 @@ namespace Memfs::Interface {
 
 					memcpy_s(fileNode.fileSecurity.Struct(), fileNode.fileSecurity.ByteSize(), securityDescriptor, securityDescriptorLength);
 				} catch (...) {
-					memfs->RemoveNode(fileNode);
+					// A5: fileNode is a local that never entered the map — RemoveNode would only
+					// hit a foreign entry of the same name. RAII releases it (and its sectors).
 					return STATUS_INSUFFICIENT_RESOURCES;
 				}
 			}
@@ -85,7 +86,6 @@ namespace Memfs::Interface {
 					                                  (PFILE_FULL_EA_INFORMATION)extraBuffer, extraLength);
 
 					if (!NT_SUCCESS(result)) {
-						memfs->RemoveNode(fileNode);
 						return result;
 					}
 				}
@@ -99,7 +99,6 @@ namespace Memfs::Interface {
 
 						memcpy_s(fileNode.reparseData.Struct(), fileNode.reparseData.ByteSize(), extraBuffer, extraLength);
 					} catch (...) {
-						memfs->RemoveNode(fileNode);
 						return STATUS_INSUFFICIENT_RESOURCES;
 					}
 				}
@@ -108,7 +107,6 @@ namespace Memfs::Interface {
 			fileNode.fileInfo.AllocationSize = allocationSize;
 			if (0 != fileNode.fileInfo.AllocationSize) {
 				if (!memfs->GetSectorManager().ReAllocate(fileNode.GetSectorNode(), fileNode.fileInfo.AllocationSize)) {
-					memfs->RemoveNode(fileNode);
 					return STATUS_INSUFFICIENT_RESOURCES;
 				}
 			}
@@ -117,10 +115,8 @@ namespace Memfs::Interface {
 			result = insertResult;
 
 			if (!NT_SUCCESS(result)) {
-				memfs->RemoveNode(fileNode);
-				if (NT_SUCCESS(result)) {
-					result = STATUS_OBJECT_NAME_COLLISION; /* should not happen! */
-				}
+				// A3: InsertNode now reports a name collision instead of handing back a
+				// foreign node under STATUS_SUCCESS. The moved-from local needs no cleanup.
 				return result;
 			}
 
@@ -191,19 +187,25 @@ namespace Memfs::Interface {
 
 		NTSTATUS result;
 
-		for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, true)) {
-			const volatile long refCount = namedStream->GetReferenceCount(true);
+		// A4: EnumerateNamedStreams searches by name — only meaningful while this node still
+		// owns its name. Otherwise we would drop the streams of whichever node has it now.
+		const auto currentOpt = memfs->FindFile(fileNode->fileName);
+		if (currentOpt.has_value() && &currentOpt.value().get() == fileNode) {
+			for (const auto& namedStream : memfs->EnumerateNamedStreams(*fileNode, true)) {
+				const volatile long refCount = namedStream->GetReferenceCount(true);
 
-			if (2 >= refCount) {
-				memfs->RemoveNode(*namedStream);
+				if (2 >= refCount) {
+					memfs->RemoveNode(*namedStream);
+				}
+
+				namedStream->Dereference(); // Release the reference added by EnumerateNamedStreams
 			}
-
-			namedStream->Dereference(); // Release the reference added by EnumerateNamedStreams
 		}
 
 		std::unique_lock lock(fileNode->nodeMutex);
 
 		fileNode->DeleteEaMap();
+		fileNode->fileInfo.EaSize = 0; // C5: the map is gone, so its accounted size must go too
 		if (ea != nullptr) {
 			result = FspFileSystemEnumerateEa(fileSystem, CompatFspFileNodeSetEa, fileNode, ea, eaLength);
 			if (!NT_SUCCESS(result)) {

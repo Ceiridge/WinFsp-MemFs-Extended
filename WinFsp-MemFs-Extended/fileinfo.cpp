@@ -90,6 +90,11 @@ namespace Memfs::Interface {
 		const auto descendants = memfs->EnumerateDescendants(*fileNode, true);
 		for (const auto& descendant : descendants) {
 			if (MEMFS_MAX_PATH <= descendant->fileName.length() - fileNameLen + newFileNameLen) {
+				// C1: EnumerateDescendants took a reference on every node — release them all
+				// before bailing out, otherwise they can never be freed again.
+				for (const auto& toRelease : descendants) {
+					toRelease->Dereference();
+				}
 				return STATUS_OBJECT_NAME_INVALID;
 			}
 		}
@@ -113,9 +118,14 @@ namespace Memfs::Interface {
 			}
 
 			const auto [result,_] = memfs->InsertNode(descendant);
-			if (!NT_SUCCESS(result)) {
+			if (STATUS_INSUFFICIENT_RESOURCES == result) {
 				FspDebugLog(__FUNCTION__ ": cannot insert into FileNodeMap; aborting\n");
 				abort();
+			}
+			if (!NT_SUCCESS(result)) {
+				// A3: the new name is taken by a node that is not ours. Leaving this descendant
+				// unlinked is the same outcome as before, but no longer silent.
+				FspDebugLog(__FUNCTION__ ": name collision while renaming a descendant\n");
 			}
 
 			descendant->Dereference(); // Remove the reference from the descendant enumeration above
